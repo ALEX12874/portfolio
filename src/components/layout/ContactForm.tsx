@@ -168,12 +168,12 @@ export default function ContactForm({ email }: ContactFormProps) {
   };
 
   const inputBase =
-    "block h-14 w-full rounded-xl border bg-white/70 px-4 text-base text-[#151515] placeholder:text-[rgba(21,21,21,0.38)] transition-[border-color,box-shadow] duration-200 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-[#E63843] focus:ring-offset-0";
+    "block h-12 w-full rounded-xl border bg-white/70 px-3.5 text-base text-[#151515] placeholder:text-[rgba(21,21,21,0.38)] transition-[border-color,box-shadow] duration-200 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-[#E63843] focus:ring-offset-0";
   const borderFor = (f: FieldName) =>
     errors[f] ? "border-[#E63843]" : "border-[rgba(21,21,21,0.12)] hover:border-[rgba(21,21,21,0.28)]";
 
   const label = (f: FieldName, text: string) => (
-    <label htmlFor={id(f)} className="mb-2 block text-sm font-semibold text-[#151515]">
+    <label htmlFor={id(f)} className="mb-1 block text-sm font-semibold text-[#151515]">
       {text}{" "}
       <span className="text-[#E63843]" aria-hidden="true">
         *
@@ -193,19 +193,19 @@ export default function ContactForm({ email }: ContactFormProps) {
     [errors[f] ? errId(f) : "", extra ?? ""].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="relative rounded-[24px] bg-[#F5F0E8] p-8 text-[#151515] shadow-[0_30px_80px_rgba(0,0,0,0.45),0_2px_0_rgba(255,255,255,0.6)_inset] sm:p-10">
+    <div className="relative mx-auto w-full max-w-[380px] rounded-[20px] bg-[#F5F0E8] p-5 text-[#151515] shadow-[0_24px_60px_rgba(0,0,0,0.4),0_2px_0_rgba(255,255,255,0.6)_inset] sm:p-6 lg:mx-0 lg:ml-auto lg:max-w-[420px]">
       {status === "success" ? (
         <div
           ref={statusRef}
           tabIndex={-1}
           role="status"
           aria-live="polite"
-          className="flex min-h-[420px] flex-col items-start justify-center focus:outline-none"
+          className="flex min-h-[300px] flex-col items-start justify-center focus:outline-none"
         >
           <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#D8FF63] text-[#151515] shadow-[0_10px_30px_rgba(216,255,99,0.35)]">
             <Check size={28} strokeWidth={3} aria-hidden="true" />
           </span>
-          <h3 className="mt-6 font-display text-[clamp(1.6rem,2.4vw,2rem)] font-extrabold leading-tight">
+          <h3 className="mt-5 font-display text-[1.25rem] font-extrabold leading-tight">
             Message sent
           </h3>
           <p className="mt-3 max-w-md text-base leading-relaxed text-[rgba(21,21,21,0.78)]">
@@ -221,11 +221,11 @@ export default function ContactForm({ email }: ContactFormProps) {
         </div>
       ) : (
         <>
-          <h3 className="font-display text-[clamp(1.6rem,2.4vw,2rem)] font-extrabold leading-tight tracking-[-0.01em]">
+          <h3 className="font-display text-[1.25rem] font-extrabold leading-tight tracking-[-0.01em]">
             Send a message
           </h3>
 
-          <form noValidate onSubmit={onSubmit} className="mt-7 space-y-5" aria-describedby={`${uid}-required`}>
+          <form noValidate onSubmit={onSubmit} className="mt-4 space-y-2.5" aria-describedby={`${uid}-required`}>
             <p id={`${uid}-required`} className="sr-only">
               All fields are required.
             </p>
@@ -315,7 +315,7 @@ export default function ContactForm({ email }: ContactFormProps) {
                 }}
                 id={id("message")}
                 name="message"
-                rows={5}
+                rows={3}
                 maxLength={LIMITS.message}
                 required
                 aria-required="true"
@@ -324,9 +324,9 @@ export default function ContactForm({ email }: ContactFormProps) {
                 value={values.message}
                 onChange={(e) => onChange("message", e.target.value)}
                 onBlur={() => onBlur("message")}
-                className={`${inputBase} ${borderFor("message")} h-auto min-h-[9.5rem] resize-y py-3.5 leading-relaxed`}
+                className={`${inputBase} ${borderFor("message")} h-auto min-h-[6rem] resize-y py-3 leading-relaxed`}
               />
-              <div className="mt-1.5 flex items-start justify-between gap-4">
+              <div className="mt-1 flex items-start justify-between gap-4">
                 <div className="min-w-0">{errorText("message")}</div>
                 <p
                   id={`${uid}-count`}
@@ -363,7 +363,7 @@ export default function ContactForm({ email }: ContactFormProps) {
               type="submit"
               disabled={status === "sending" || cooldownLeft > 0}
               aria-disabled={status === "sending" || cooldownLeft > 0}
-              className="group inline-flex h-14 items-center gap-3 rounded-full bg-[#151515] px-7 font-display text-[0.95rem] font-bold text-[#F5F0E8] shadow-[0_10px_24px_rgba(21,21,21,0.25)] transition-[transform,box-shadow,background-color] duration-200 hover:shadow-[0_14px_30px_rgba(21,21,21,0.32)] active:translate-y-px active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E63843] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F0E8]"
+              className="group inline-flex h-11 w-full items-center justify-center gap-3 rounded-full bg-[#151515] px-6 font-display text-[0.92rem] sm:w-auto font-bold text-[#F5F0E8] shadow-[0_10px_24px_rgba(21,21,21,0.25)] transition-[transform,box-shadow,background-color] duration-200 hover:shadow-[0_14px_30px_rgba(21,21,21,0.32)] active:translate-y-px active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E63843] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F0E8]"
             >
               {status === "sending" ? (
                 <>

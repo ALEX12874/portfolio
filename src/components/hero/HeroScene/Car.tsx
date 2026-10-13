@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { loopRate, loopSpeed } from "./clock";
 
 const Z_NEAR = 16;
 const Z_FAR = -46;
@@ -57,7 +58,8 @@ export default function Car({
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    const travelled = ((t * speed + offset * TRACK) % TRACK) * 1;
+    const lapSpeed = loopSpeed(speed, TRACK);
+    const travelled = ((t * lapSpeed + offset * TRACK) % TRACK) * 1;
     const z = dir === 1 ? Z_NEAR - travelled : Z_FAR + travelled;
 
     if (group.current) {
@@ -90,7 +92,7 @@ export default function Car({
       brake.current.color.copy(brakeBase).lerp(new THREE.Color("#FF3040"), g);
     }
 
-    const spin = t * speed * 1.6;
+    const spin = t * loopRate(speed * 1.6);
     wheels.current.forEach((w) => {
       if (w) w.rotation.x = dir === 1 ? spin : -spin;
     });

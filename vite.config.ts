@@ -23,6 +23,8 @@ export default defineConfig(({ mode }) => {
       // one copy of react / three / fiber, so drei always shares fiber's store
       dedupe: ["react", "react-dom", "three", "@react-three/fiber"],
     },
+    // no console noise / debugger statements in production bundles
+    esbuild: mode === "production" ? { drop: ["console", "debugger"] } : undefined,
     optimizeDeps: {
       include: ["three", "@react-three/fiber", "@react-three/drei"],
     },

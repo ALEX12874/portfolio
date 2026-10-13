@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
+import { loopPeriod } from "./clock";
 import { assets } from "../../../data/assets";
 
 const FACE_W = 16; // ≈ 16 × 5 units with adult = 1.7
@@ -149,20 +150,20 @@ export default function Billboard() {
     const t = clock.getElapsedTime();
 
     // slow light sweep across the panel — one pass every 7 s
-    if (sweep.current) sweepTexture.offset.x = (t / 7) % 1;
+    if (sweep.current) sweepTexture.offset.x = (t / loopPeriod(7)) % 1;
 
     // lime LED chase — one segment-cycle every 6 s, restrained
-    const chase = (t / 6) % 1;
+    const chase = (t / loopPeriod(6)) % 1;
     ledH.offset.x = chase;
     ledV.offset.x = chase;
 
     // breathing halo behind the panel (±4%)
-    if (halo.current) halo.current.opacity = 0.09 + Math.sin((t / 7) * Math.PI * 2) * 0.03;
+    if (halo.current) halo.current.opacity = 0.09 + Math.sin((t / loopPeriod(7)) * Math.PI * 2) * 0.03;
 
     // attention ripples on the pavement — 5 s loop, staggered, ≤ 15% opacity
     ripples.current.forEach((mesh, i) => {
       if (!mesh) return;
-      const phase = ((t / 5 + i / 3) % 1);
+      const phase = ((t / loopPeriod(5) + i / 3) % 1);
       const s = 0.55 + phase * 1.35;
       mesh.scale.setScalar(s);
       const mat = mesh.material as THREE.MeshBasicMaterial;

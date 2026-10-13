@@ -1,3 +1,21 @@
+/* metric-matched local fallbacks: minimal text shift when the web fonts swap in */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial");
+  size-adjust: 104%;
+  ascent-override: 88%;
+  descent-override: 21%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  size-adjust: 107%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 /* ============================================================
    LOCKED BRAND PALETTE — no colour outside these may be used.
    ============================================================ */
@@ -28,9 +46,9 @@
   --dur-slow: 900ms;
 
   /* Type */
-  --font-display: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-display: "Archivo", "Archivo Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
-  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-body: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
 
   /* Fluid display sizes */

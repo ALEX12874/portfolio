@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import DottedBackground from "../layout/DottedBackground";
 import SectionHeader from "../layout/SectionHeader";
 import ProjectSelector from "./ProjectSelector";
@@ -75,7 +75,7 @@ export default function ProjectsSection() {
       style={themeStyle}
     >
       {/* atmosphere — animates between any two projects */}
-      <motion.div
+      <m.div
         aria-hidden="true"
         className="absolute inset-0"
         initial={false}

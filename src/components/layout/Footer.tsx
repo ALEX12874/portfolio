@@ -38,8 +38,8 @@ export default function Footer() {
       <DottedBackground tone="ink" />
       <div className="absolute inset-x-0 top-0 h-px bg-[rgba(245,240,232,0.18)]" aria-hidden="true" />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-10 pt-24 sm:px-8 lg:px-12 lg:pt-32">
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-16 xl:gap-24">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pt-24 lg:px-12 lg:pt-32">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-16 xl:gap-24">
           {/* ---- details ---- */}
           <div>
             <p className="eyebrow text-[#E63843]">GET IN TOUCH</p>
@@ -49,12 +49,12 @@ export default function Footer() {
               <span className="block text-[#E63843]">{site.lastName}</span>
             </h2>
 
-            <p className="mt-7 font-display text-base font-bold uppercase tracking-[0.08em] text-[rgba(245,240,232,0.85)] sm:text-lg">
+            <p className="mt-5 font-display text-base font-bold uppercase tracking-[0.08em] text-[rgba(245,240,232,0.85)] sm:text-lg">
               {site.roleLine}
             </p>
 
-            <dl className="mt-12 divide-y divide-[rgba(245,240,232,0.12)] border-y border-[rgba(245,240,232,0.12)]">
-              <div className="py-6">
+            <dl className="mt-8 divide-y divide-[rgba(245,240,232,0.12)] border-y border-[rgba(245,240,232,0.12)]">
+              <div className="py-4 sm:py-6">
                 <dt className={rowLabel}>Location</dt>
                 <dd className="mt-3 inline-flex items-center gap-2.5 text-lg">
                   <MapPin size={18} aria-hidden="true" className="text-[#D8FF63]" />
@@ -62,7 +62,7 @@ export default function Footer() {
                 </dd>
               </div>
 
-              <div className="py-6">
+              <div className="py-4 sm:py-6">
                 <dt className={rowLabel}>Email</dt>
                 <dd className="mt-3 flex flex-wrap items-center gap-3">
                   <a
@@ -90,7 +90,7 @@ export default function Footer() {
                 </dd>
               </div>
 
-              <div className="py-6">
+              <div className="py-4 sm:py-6">
                 <dt className={rowLabel}>Elsewhere</dt>
                 <dd className="mt-3">
                   <a
@@ -114,7 +114,7 @@ export default function Footer() {
         </div>
 
         {/* ---- bottom bar ---- */}
-        <div className="mt-16 flex flex-col items-start justify-between gap-6 border-t border-[rgba(245,240,232,0.15)] pt-8 sm:flex-row sm:items-center lg:mt-20">
+        <div className="mt-12 flex flex-col items-start justify-between gap-6 border-t border-[rgba(245,240,232,0.15)] pt-8 sm:flex-row sm:items-center lg:mt-20">
           <p className="text-sm text-[rgba(245,240,232,0.6)]">{site.copyright}</p>
 
           <button

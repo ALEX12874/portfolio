@@ -1,10 +1,17 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { CAPTURE, LOOP_S, loopRate } from "./clock";
 
 const Z_START = -30;
 const Z_END = 10;
 const TRACK = Z_END - Z_START;
+
+/**
+ * Capture mode: walkers loop a shorter track in exactly LOOP_S, anchored at
+ * the near (off-frame) end so half of every fade happens out of view.
+ */
+const FADE_M = 1.6;
 
 const BILLBOARD_X = -11.4;
 const BILLBOARD_Z = -5;
@@ -62,21 +69,48 @@ export default function Pedestrian({ cfg }: { cfg: PedestrianConfig }) {
 
   const x = cfg.xOverride ?? LANE_X[cfg.lane];
   const standing = cfg.speed === 0;
+  const materials = useRef<THREE.Material[]>([]);
+
+  // capture only: walkers fade in/out at their (shorter) loop ends, so the
+  // exported video has no popping figures
+  useEffect(() => {
+    if (!CAPTURE || standing || !root.current) return;
+    const mats: THREE.Material[] = [];
+    root.current.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+      if (m && !mats.includes(m)) {
+        m.transparent = true;
+        // opaque materials are compiled with alpha forced to 1: recompile
+        m.needsUpdate = true;
+        mats.push(m);
+      }
+    });
+    materials.current = mats;
+  }, [standing]);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
     // ---- travel along the footpath lane (seamless loop; 0 = planted) ----
-    const travelled = standing ? cfg.offset * TRACK : (t * cfg.speed + cfg.offset * TRACK) % TRACK;
-    const z = cfg.dir === 1 ? Z_END - travelled : Z_START + travelled;
+    let z: number;
+    if (CAPTURE && !standing) {
+      const len = cfg.speed * LOOP_S; // one lap per loop at the real walking speed
+      const along = (t * cfg.speed + cfg.offset * len) % len;
+      z = cfg.dir === 1 ? Z_END - along : Z_END - len + along;
+      const fade = Math.min(1, along / FADE_M, (len - along) / FADE_M);
+      for (const m of materials.current) m.opacity = fade;
+    } else {
+      const travelled = standing ? cfg.offset * TRACK : (t * cfg.speed + cfg.offset * TRACK) % TRACK;
+      z = cfg.dir === 1 ? Z_END - travelled : Z_START + travelled;
+    }
 
     // ---- walk / run cycle ----
-    const cadence = cfg.gait * (cfg.runner ? 1.9 : 1.15);
+    const cadence = loopRate(cfg.gait * (cfg.runner ? 1.9 : 1.15));
     const phase = t * cadence + cfg.offset * 6.28;
     const swing = cfg.runner ? 0.95 : 0.6;
     const s = Math.sin(phase);
     // idle breathing for standing watchers
-    const breath = Math.sin(t * 1.4 + cfg.offset * 5) * 0.012;
+    const breath = Math.sin(t * loopRate(1.4) + cfg.offset * 5) * 0.012;
 
     if (root.current) {
       root.current.position.set(x, 0, z);
@@ -133,7 +167,7 @@ export default function Pedestrian({ cfg }: { cfg: PedestrianConfig }) {
   const skin = NEUTRAL;
 
   return (
-    <group ref={root} position={[x, 0, Z_END]}>
+    <group ref={root} name={`walker-${cfg.id}`} position={[x, 0, Z_END]}>
       <group ref={body}>
         {/* legs */}
         <group ref={legL} position={[-0.1, 0.78, 0]}>

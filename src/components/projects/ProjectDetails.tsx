@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { Project } from "../../data/projects";
 import ProjectCTA from "./ProjectCTA";
@@ -23,12 +23,12 @@ export default function ProjectDetails({
   onOpenCaseStudy,
 }: ProjectDetailsProps) {
   return (
-    <motion.div
+    <m.div
       key={project.id}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: 0.28, ease: EASE }}
-      className="relative flex h-full flex-col rounded-xl border border-[rgba(245,240,232,0.14)] bg-[rgba(21,21,21,0.55)] p-6 backdrop-blur-[2px] sm:p-8"
+      className="relative flex h-full flex-col rounded-xl border border-[rgba(245,240,232,0.14)] bg-[rgba(21,21,21,0.6)] p-5 sm:p-8"
     >
       <p className="font-display text-[0.7rem] font-bold uppercase tracking-[0.22em] text-[var(--proj-accent)]">
         {project.number} / {project.name}
@@ -86,6 +86,6 @@ export default function ProjectDetails({
           </button>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

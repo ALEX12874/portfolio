@@ -56,11 +56,38 @@
       }
     </script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- hero poster (the LCP image): fetched in parallel with the app script;
+         same rule as HeroVideo: phone composition below 900px or portrait -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/src/assets/hero/hero-phone.webp"
+      media="(max-width: 899px), (orientation: portrait)"
+      fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/src/assets/hero/hero-wide.webp"
+      media="(min-width: 900px) and (orientation: landscape)"
+      fetchpriority="high"
+    />
+    <!-- the hero headline face (Archivo 900); fonts are self-hosted -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/node_modules/@fontsource/archivo/files/archivo-latin-900-normal.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2"
+      crossorigin
     />
   </head>
   <body>

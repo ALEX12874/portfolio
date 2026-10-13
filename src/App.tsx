@@ -1,17 +1,24 @@
+import { lazy } from "react";
+import { LazyMotion, domAnimation } from "framer-motion";
 import TopBar from "./components/layout/TopBar";
-import Footer from "./components/layout/Footer";
 import Hero from "./components/hero/Hero";
 import Capabilities from "./components/skills/Capabilities";
-import ProjectsSection from "./components/projects/ProjectsSection";
-import ExperienceSection from "./components/experience/ExperienceSection";
-import PerspectivesSection from "./components/perspectives/PerspectivesSection";
+import DeferredSection from "./components/layout/DeferredSection";
+
+// below the fold: separate chunks, rendered right after first paint
+const ProjectsSection = lazy(() => import("./components/projects/ProjectsSection"));
+const ExperienceSection = lazy(() => import("./components/experience/ExperienceSection"));
+const PerspectivesSection = lazy(() => import("./components/perspectives/PerspectivesSection"));
+const Footer = lazy(() => import("./components/layout/Footer"));
 
 /**
  * Single-page portfolio: five sections + footer.
  */
 export default function App() {
   return (
-    <>
+    // m.* components + the compact DOM feature set (no layout/drag features
+    // are used) keep framer-motion's share of the bundle small
+    <LazyMotion features={domAnimation} strict>
       <a className="skip-link" href="#home">
         Skip to content
       </a>
@@ -23,14 +30,22 @@ export default function App() {
 
         <Capabilities />
 
-        <ProjectsSection />
+        <DeferredSection id="projects" tone="#14342B">
+          <ProjectsSection />
+        </DeferredSection>
 
-        <ExperienceSection />
+        <DeferredSection id="experience" tone="#151515">
+          <ExperienceSection />
+        </DeferredSection>
 
-        <PerspectivesSection />
+        <DeferredSection id="perspectives" tone="#F5F0E8">
+          <PerspectivesSection />
+        </DeferredSection>
       </main>
 
-      <Footer />
-    </>
+      <DeferredSection id="contact" tone="#151515">
+        <Footer />
+      </DeferredSection>
+    </LazyMotion>
   );
 }

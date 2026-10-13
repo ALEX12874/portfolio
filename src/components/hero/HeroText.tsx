@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { site } from "../../data/site";
 import { assets, RESUME_FILENAME } from "../../data/assets";
@@ -39,46 +39,46 @@ function withMarkers(text: string, keys: readonly string[]) {
 
 export default function HeroText() {
   return (
-    <motion.div
+    <m.div
       variants={container}
       initial="hidden"
       animate="show"
       className="hero-copy relative z-10 max-w-[46rem]"
     >
-      <motion.p variants={rise} className="eyebrow text-[#E63843]">
+      <m.p variants={rise} className="eyebrow text-[#E63843]">
         {site.eyebrow}
-      </motion.p>
+      </m.p>
 
-      <motion.h1
+      <m.h1
         variants={rise}
         id="home-heading"
         className="display mt-7 text-[length:var(--size-hero)] leading-[0.9]"
       >
         <span className="block text-[#151515]">{site.firstName}</span>
         <span className="block text-[#E63843]">{site.lastName}</span>
-      </motion.h1>
+      </m.h1>
 
-      <motion.div variants={rise} className="mt-8 max-w-[38rem]">
+      <m.div variants={rise} className="mt-8 max-w-[38rem]">
         <p className="text-[clamp(1.05rem,1.5vw,1.3rem)] leading-relaxed text-[rgba(21,21,21,0.72)]">
           {withMarkers(site.introLead, site.introLeadHighlights)}
         </p>
         <p className="mt-5 text-[clamp(1rem,1.2vw,1.12rem)] font-semibold leading-relaxed text-[#151515]">
           {site.introBold}
         </p>
-        <p className="mt-4 text-[clamp(0.95rem,1.1vw,1.05rem)] leading-relaxed text-[rgba(21,21,21,0.55)]">
+        <p className="mt-4 text-[clamp(1rem,1.1vw,1.05rem)] leading-relaxed text-[rgba(21,21,21,0.6)]">
           {site.introLight}
         </p>
-      </motion.div>
+      </m.div>
 
-      <motion.div
+      <m.div
         variants={rise}
-        className="mt-10 flex flex-wrap items-center gap-4 sm:gap-5"
+        className="mt-9 flex flex-wrap items-center gap-3 pb-[env(safe-area-inset-bottom)] sm:mt-10 sm:gap-5"
       >
         <div className="flex items-center gap-2">
           <MagneticButton
             href={assets.resume}
             newTab
-            ariaLabel="Get résumé — opens in a new tab"
+            ariaLabel="Get Resume — opens in a new tab"
             className="shrink-0"
           >
             Get Resume
@@ -99,7 +99,7 @@ export default function HeroText() {
         <button
           type="button"
           onClick={() => scrollToSection("projects")}
-          className="group inline-flex items-center gap-2 px-1 py-3 font-display text-[0.95rem] font-bold uppercase tracking-[0.08em] text-[#151515] transition-colors duration-300 hover:text-[#E63843]"
+          className="group order-last inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[rgba(21,21,21,0.2)] px-5 py-3 font-display text-[0.95rem] font-bold uppercase tracking-[0.08em] text-[#151515] transition-colors duration-300 hover:text-[#E63843] active:bg-[rgba(21,21,21,0.05)] sm:order-none sm:w-auto sm:justify-start sm:border-0 sm:px-1"
         >
           Explore My Work
           <span
@@ -120,7 +120,7 @@ export default function HeroText() {
             </SocialButton>
           ) : null}
         </div>
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }

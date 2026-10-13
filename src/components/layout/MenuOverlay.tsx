@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { sections } from "../../data/site";
 import { scrollToSection } from "../../lib/scroll";
 
@@ -66,13 +66,13 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
   return (
     <AnimatePresence>
       {open ? (
-        <motion.div
+        <m.div
           id="site-menu"
           ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Site menu"
-          className="fixed inset-0 z-[90] flex flex-col bg-[#151515] dots-ink"
+          className="fixed inset-0 z-[90] flex h-[100dvh] flex-col bg-[#151515] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] dots-ink"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -89,7 +89,7 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full px-3 py-2 font-display text-base font-bold text-[#F5F0E8] transition-colors duration-300 hover:text-[#D8FF63]"
+              className="inline-flex min-h-[44px] items-center rounded-full px-3 py-2 font-display text-base font-bold text-[#F5F0E8] transition-colors duration-300 hover:text-[#D8FF63] active:text-[#D8FF63]"
             >
               Close ↗
             </button>
@@ -101,7 +101,7 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
           >
             <ul className="mx-auto w-full max-w-[1600px] py-10">
               {sections.map((s, i) => (
-                <motion.li
+                <m.li
                   key={s.id}
                   initial={{ opacity: 0, y: 34 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -112,7 +112,7 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
                     type="button"
                     ref={i === 0 ? firstRef : undefined}
                     onClick={() => go(s.id)}
-                    className="group flex w-full items-baseline justify-between gap-6 py-4 text-left sm:py-6"
+                    className="group flex min-h-[48px] w-full items-baseline justify-between gap-6 py-4 text-left sm:py-6"
                   >
                     <span className="display text-[clamp(2rem,7vw,4.75rem)] text-[#F5F0E8] transition-[color,transform] duration-500 ease-editorial group-hover:translate-x-3 group-hover:text-[#D8FF63]">
                       {s.label}
@@ -121,7 +121,7 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
                       {String(i + 1).padStart(2, "0")}
                     </span>
                   </button>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
           </nav>
@@ -131,7 +131,7 @@ export default function MenuOverlay({ open, onClose }: MenuOverlayProps) {
               Esc to close
             </p>
           </div>
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

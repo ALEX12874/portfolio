@@ -1,5 +1,5 @@
-import { Suspense, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import Road from "./Road";
 import Footpath from "./Footpath";
@@ -8,19 +8,74 @@ import Car from "./Car";
 import Pedestrian, { pedestrians } from "./Pedestrian";
 import Environment from "./Environment";
 import Rig from "./Rig";
+import { CAPTURE, CAPTURE_VARIANT } from "./clock";
 
 interface SceneProps {
   /** Pause the render loop while the hero is off-screen. */
   active: boolean;
   /** Pointer parallax (disabled on touch / reduced motion). */
   parallax: boolean;
-  /** Called once if the device can't hold ~30 fps; the hero swaps to 2.5D. */
+  /** Called once if the device can't hold its frame rate (or loses WebGL). */
   onLowFps?: () => void;
+}
+
+/** Camera framings: live = the designed hero; phone = tighter on the board. */
+interface Framing {
+  position: [number, number, number];
+  lookAt: [number, number, number];
+  fov: number;
+}
+const LIVE: Framing = { position: [24.37, 2.2, 6.31], lookAt: [-7.3, 7.5, -2.61], fov: 32 };
+const FRAMINGS: Record<"wide" | "phone", Framing> = {
+  // 1280×1024 video: board ≈ 76% of the width, crowd + car at the base
+  wide: { position: [24.37, 2.2, 6.31], lookAt: [-7.3, 7.0, -2.61], fov: 27 },
+  // 960×864 video: board ≥ 92% of the width, every letter visible
+  phone: { position: [24.37, 2.2, 6.31], lookAt: [-7.07, 6.8, -3.36], fov: 25.3 },
+};
+
+/** `?cam=x,y,z&look=x,y,z&fov=n` overrides the capture camera (tuning only). */
+function captureFraming(): Framing {
+  const base = FRAMINGS[CAPTURE_VARIANT];
+  const q = new URLSearchParams(window.location.search);
+  const vec = (k: string) => {
+    const v = q.get(k)?.split(",").map(Number);
+    return v && v.length === 3 && v.every(Number.isFinite) ? (v as [number, number, number]) : undefined;
+  };
+  return {
+    position: vec("cam") ?? base.position,
+    lookAt: vec("look") ?? base.lookAt,
+    fov: Number(q.get("fov")) || base.fov,
+  };
+}
+
+declare global {
+  interface Window {
+    __setSceneTime?: (seconds: number) => void;
+    __heroAssetsReady?: boolean;
+  }
+}
+
+/** Capture mode: render exactly the requested timestamp on demand. */
+function CaptureController() {
+  const advance = useThree((s) => s.advance);
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    (window as unknown as { __heroScene?: THREE.Scene }).__heroScene = scene;
+    THREE.DefaultLoadingManager.onLoad = () => {
+      window.__heroAssetsReady = true;
+    };
+    window.__setSceneTime = (seconds: number) => advance(seconds);
+    advance(0.0001);
+    return () => {
+      window.__setSceneTime = undefined;
+    };
+  }, [advance, scene]);
+  return null;
 }
 
 const WARMUP_S = 0.6; // ignore shader-compile frames
 const SAMPLE_S = 2; // then average frame time over ~2 s
-const SLOW_MS = 34; // ≈ 29 fps
+const SLOW_MS = 24; // ≈ 42 fps
 
 /** Adaptive quality guard: measures the average frame time after mount. */
 function FrameGuard({ onLowFps }: { onLowFps?: () => void }) {
@@ -68,23 +123,38 @@ const CARS = [
  *   row dissolves into the page.
  */
 export default function Scene({ active, parallax, onLowFps }: SceneProps) {
+  const framing = CAPTURE ? captureFraming() : LIVE;
   return (
     <Canvas
       shadows
-      dpr={[1, 1.75]}
-      frameloop={active ? "always" : "never"}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      camera={{ position: [24.37, 2.2, 6.31], fov: 32, near: 0.1, far: 260 }}
+      dpr={CAPTURE ? 1 : [1, 1.75]}
+      frameloop={CAPTURE ? "never" : active ? "always" : "never"}
+      gl={{
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: CAPTURE,
+      }}
+      camera={{ position: framing.position, fov: framing.fov, near: 0.1, far: 260 }}
       onCreated={({ camera, gl }) => {
         // transparent canvas: the page background is the sky
         gl.setClearColor(0x000000, 0);
         // filmic response so the footpath never reads as white glare
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 0.85;
-        camera.lookAt(-7.3, 7.5, -2.61);
+        camera.lookAt(...framing.lookAt);
+        // iOS Safari caps live WebGL contexts: on loss, hand over to the video
+        gl.domElement.addEventListener(
+          "webglcontextlost",
+          (e) => {
+            e.preventDefault();
+            onLowFps?.();
+          },
+          { once: true }
+        );
       }}
     >
-      <FrameGuard onLowFps={onLowFps} />
+      {CAPTURE ? <CaptureController /> : <FrameGuard onLowFps={onLowFps} />}
 
       {/* haze: crisp foreground, far row dissolving into the ivory page */}
       <fog attach="fog" args={["#F5F0E8", 52, 115]} />
@@ -118,7 +188,7 @@ export default function Scene({ active, parallax, onLowFps }: SceneProps) {
       <directionalLight position={[-8, 7, -20]} intensity={0.6} color="#F5F0E8" />
 
       <Suspense fallback={null}>
-        <Rig enabled={parallax}>
+        <Rig enabled={parallax && !CAPTURE}>
           <group rotation-y={0.36} position={[5, 0, -2]}>
             <Road />
             <Footpath />

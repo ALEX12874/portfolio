@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { loopRate, seeded } from "./clock";
 
 /**
  * Procedural paving texture — finer tiles, subtle grain, lowered albedo so
@@ -16,10 +17,11 @@ function makePavingTexture(): THREE.CanvasTexture {
   if (ctx) {
     ctx.fillStyle = "#A8A093";
     ctx.fillRect(0, 0, size, size);
-    // fine per-tile grain
+    // fine per-tile grain (seeded: identical every load)
+    const rnd = seeded(1717);
     for (let i = 0; i < 900; i += 1) {
-      ctx.fillStyle = `rgba(21,21,21,${Math.random() * 0.05})`;
-      ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+      ctx.fillStyle = `rgba(21,21,21,${rnd() * 0.05})`;
+      ctx.fillRect(rnd() * size, rnd() * size, 1.5, 1.5);
     }
     ctx.strokeStyle = "rgba(21,21,21,0.16)";
     ctx.lineWidth = 2;
@@ -50,8 +52,8 @@ function Tree({ position }: { position: [number, number, number] }) {
   useFrame(({ clock }) => {
     if (!sway.current) return;
     const t = clock.getElapsedTime();
-    sway.current.rotation.z = Math.sin(t * 0.6 + position[2]) * 0.02;
-    sway.current.rotation.x = Math.cos(t * 0.45 + position[2]) * 0.014;
+    sway.current.rotation.z = Math.sin(t * loopRate(0.6) + position[2]) * 0.02;
+    sway.current.rotation.x = Math.cos(t * loopRate(0.45) + position[2]) * 0.014;
   });
 
   return (

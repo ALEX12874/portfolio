@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import type { ReactNode } from "react";
 import type { ProjectTheme } from "../../data/projects";
 
@@ -26,7 +26,7 @@ export default function ProjectTransition({
     <div className="absolute inset-0 overflow-hidden">
       {/* cross-fading atmosphere + motif */}
       <AnimatePresence mode="wait">
-        <motion.div
+        <m.div
           key={projectId}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -35,12 +35,12 @@ export default function ProjectTransition({
           className="absolute inset-0"
         >
           {children}
-        </motion.div>
+        </m.div>
       </AnimatePresence>
 
       {/* token-driven wipe panel */}
       <AnimatePresence>
-        <motion.div
+        <m.div
           key={`${projectId}-wipe`}
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-20"

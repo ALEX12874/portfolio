@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { drift, loopRate, seeded } from "./clock";
 
 /**
  * Layered skyline built as two rows that face the new camera:
@@ -83,11 +84,12 @@ export default function Environment() {
   );
 
   const dustGeometry = useMemo(() => {
+    const rnd = seeded(4242);
     const positions = new Float32Array(DUST_COUNT * 3);
     for (let i = 0; i < DUST_COUNT; i += 1) {
-      positions[i * 3] = -20 + Math.random() * 30;
-      positions[i * 3 + 1] = 1 + Math.random() * 8;
-      positions[i * 3 + 2] = -24 + Math.random() * 38;
+      positions[i * 3] = -20 + rnd() * 30;
+      positions[i * 3 + 1] = 1 + rnd() * 8;
+      positions[i * 3 + 2] = -24 + rnd() * 38;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -98,12 +100,12 @@ export default function Environment() {
     const t = clock.getElapsedTime();
     if (sun.current) {
       // gentle sun drift — barely perceptible, keeps highlights alive
-      sun.current.position.x = 3.5 + Math.sin(t * 0.06) * 1.6;
-      sun.current.position.z = 2 + Math.cos(t * 0.05) * 1.2;
+      sun.current.position.x = 3.5 + Math.sin(drift(t) * 0.06) * 1.6;
+      sun.current.position.z = 2 + Math.cos(drift(t) * 0.05) * 1.2;
     }
     if (dust.current) {
-      dust.current.rotation.y = t * 0.012;
-      dust.current.position.y = Math.sin(t * 0.25) * 0.25;
+      dust.current.rotation.y = drift(t) * 0.012;
+      dust.current.position.y = Math.sin(t * loopRate(0.25)) * 0.25;
     }
   });
 

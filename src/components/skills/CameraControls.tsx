@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { OUTER_ORBIT } from "./planets";
+import { focus } from "./planets/focus";
+
+const target = new THREE.Vector3();
+const desired = new THREE.Vector3();
 
 interface CameraControlsProps {
   /** Rotation is disabled on reduced-motion devices. */
@@ -34,6 +38,7 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
     lastX: 0,
     lastY: 0,
     dominantX: true,
+    framed: false,
   });
 
   useEffect(() => {
@@ -93,6 +98,15 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
 
   useFrame(() => {
     const s = state.current;
+    // portrait (phone) canvases: a steeper ~35° view uses the tall canvas
+    if (!s.framed) {
+      s.framed = true;
+      const a = (camera as THREE.PerspectiveCamera).aspect || 1.6;
+      if (a < 1) {
+        s.el = 0.62;
+        s.targetEl = 0.62;
+      }
+    }
     s.az = THREE.MathUtils.lerp(s.az, s.targetAz, 0.07);
     s.el = THREE.MathUtils.lerp(s.el, s.targetEl, 0.07);
 
@@ -104,15 +118,25 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
     // outer orbit spans FILL of the width; the tilted ellipse (+ planet
     // headroom) must also fit vertically when the user drags it steeper.
     // portrait canvases get a little extra margin for the near-side bulge
-    const halfW = OUTER_ORBIT / (aspect < 1.2 ? FILL - 0.08 : FILL);
-    const halfH = (OUTER_ORBIT * Math.sin(s.el) + 2.4) / 0.9;
+    const halfW = OUTER_ORBIT / (aspect < 1.2 ? 0.9 : FILL);
+    const halfH = (OUTER_ORBIT * Math.sin(s.el) + 2.4) / 0.92;
     const distance = Math.max(halfW / (tanV * aspect), halfH / tanV);
 
     const y = Math.sin(s.el) * distance;
     const horizontal = Math.cos(s.el) * distance;
 
-    camera.position.set(Math.sin(s.az) * horizontal, y, Math.cos(s.az) * horizontal);
-    camera.lookAt(0, 0, 0);
+    // portrait canvases: ease the look-at toward the selected planet so it
+    // sits in the canvas centre; otherwise back to the Sun at the origin
+    if (focus.active && aspect < 1.2) desired.copy(focus.position).multiplyScalar(0.7);
+    else desired.set(0, 0, 0);
+    target.lerp(desired, 0.06);
+
+    camera.position.set(
+      target.x + Math.sin(s.az) * horizontal,
+      target.y + y,
+      target.z + Math.cos(s.az) * horizontal
+    );
+    camera.lookAt(target);
   });
 
   return null;

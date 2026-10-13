@@ -1,21 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { assets } from "../../../data/assets";
 
 /*
- * One shared coordinate system (viewBox 0 0 800 450, bottom-anchored "slice"
- * so nothing is ever stretched): the road, its lane lines, the route line,
- * the speed lines and the trucks all live in the same SVG, so the trucks
- * always sit on the road at the road's angle, whatever the stage's shape.
+ * One coordinate system: viewBox 0 0 800 600 (the stage is 4:3 on every
+ * device, so "slice" never distorts). The logo plate owns the top; the road
+ * is a rolling S-curve confined to the bottom half. Road strokes, route line,
+ * speed lines and trucks all use the same <path id="wrepd-lane">, so the
+ * trucks follow every bend with their wheels on the asphalt.
  */
-const SLOPE = -0.287; // road rises to the right: atan(0.287) ≈ 16°
-const ANGLE = (Math.atan(SLOPE) * 180) / Math.PI; // ≈ -16°
-const ROAD_TOP = 330; // road's upper (far) edge at x = 0
-const ROAD_THICK = 120;
-const yAt = (x: number, offset: number) => ROAD_TOP + offset + SLOPE * x;
-const line = (offset: number, x0 = -200, x1 = 1000) => `M ${x0} ${yAt(x0, offset)} L ${x1} ${yAt(x1, offset)}`;
-
-const NEAR_LANE = 80; // offsets from the road's top edge
-const FAR_LANE = 42;
+const LANE =
+  "M -80 470 C 40 430, 140 382, 260 400 S 450 500, 580 452 S 760 372, 880 392";
 const LOOP_S = 12;
 
 /**
@@ -107,12 +101,12 @@ function Truck({ spin }: { spin: boolean }) {
   );
 }
 
-/** A truck driving the lane path: fades in/out at the ends, shrinks with distance. */
-function MovingTruck({ lane, begin, scale }: { lane: string; begin: number; scale: number }) {
+/** A truck driving the lane: tilts with the road, shrinks with distance, fades at the ends. */
+function MovingTruck({ begin, scale }: { begin: number; scale: number }) {
   return (
     <g opacity={0}>
       <animateMotion dur={`${LOOP_S}s`} begin={`${begin}s`} repeatCount="indefinite" rotate="auto">
-        <mpath href={`#${lane}`} />
+        <mpath href="#wrepd-lane" />
       </animateMotion>
       <animate
         attributeName="opacity"
@@ -123,12 +117,12 @@ function MovingTruck({ lane, begin, scale }: { lane: string; begin: number; scal
         repeatCount="indefinite"
       />
       <g>
-        {/* perspective: large near (bottom-left), small far (top-right) */}
+        {/* perspective: ~1.1 near (left) → ~0.75 far (right) */}
         <animateTransform
           attributeName="transform"
           type="scale"
-          from={`${1.15 * scale}`}
-          to={`${0.55 * scale}`}
+          from={`${1.1 * scale}`}
+          to={`${0.75 * scale}`}
           dur={`${LOOP_S}s`}
           begin={`${begin}s`}
           repeatCount="indefinite"
@@ -139,18 +133,37 @@ function MovingTruck({ lane, begin, scale }: { lane: string; begin: number; scal
   );
 }
 
+/** Reduced motion: one truck parked mid-road, tilted to the road tangent. */
+function StaticTruck() {
+  const ref = useRef<SVGGElement | null>(null);
+  useEffect(() => {
+    const g = ref.current;
+    const path = g?.ownerSVGElement?.querySelector<SVGPathElement>("#wrepd-lane");
+    if (!g || !path) return;
+    const len = path.getTotalLength();
+    const at = len * 0.42;
+    const p = path.getPointAtLength(at);
+    const q = path.getPointAtLength(at + 1);
+    const deg = (Math.atan2(q.y - p.y, q.x - p.x) * 180) / Math.PI;
+    g.setAttribute("transform", `translate(${p.x} ${p.y}) rotate(${deg}) scale(0.95)`);
+  }, []);
+  return (
+    <g ref={ref}>
+      <Truck spin={false} />
+    </g>
+  );
+}
+
 /**
- * WREPD atmosphere: campaign red + crisp white + ink shadows. A slanted road
- * with a self-drawing lime route, wrapped trucks driving along it (tilted to
- * the road, scaled for depth), parallel speed lines and understated GPS pins.
+ * WREPD atmosphere: campaign red + crisp white + ink. A rolling road along
+ * the bottom with a self-drawing lime route, wrapped trucks following its
+ * curves, subtle speed lines and GPS pins above the road (never on the logo).
  */
 export default function WrepdEnv() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
-
-  const midX = 380;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -163,12 +176,73 @@ export default function WrepdEnv() {
         }}
       />
 
-      {/* GPS pins */}
+      <svg
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 800 600"
+        preserveAspectRatio="xMidYMax slice"
+      >
+        <defs>
+          <path id="wrepd-lane" d={LANE} />
+          <linearGradient id="wrepd-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#A9242E" />
+            <stop offset="1" stopColor="#8F1F27" />
+          </linearGradient>
+        </defs>
+
+        {/* darker red ground below the road */}
+        <path d={`${LANE} L 880 640 L -80 640 Z`} fill="url(#wrepd-ground)" />
+
+        {/* subtle speed lines following the road's direction */}
+        <g fill="none" stroke="#F5F0E8" strokeLinecap="round" opacity={0.2}>
+          {[-70, -112].map((dy, i) => (
+            <path key={dy} d={LANE} transform={`translate(0 ${dy})`} strokeWidth={3} strokeDasharray="70 520">
+              {reduced ? null : (
+                <animate
+                  attributeName="stroke-dashoffset"
+                  from="590"
+                  to="0"
+                  dur={`${3.4 + i * 0.7}s`}
+                  repeatCount="indefinite"
+                />
+              )}
+            </path>
+          ))}
+        </g>
+
+        {/* road: light edge → asphalt → centre dashes → lime route */}
+        <path d={LANE} fill="none" stroke="rgba(245,240,232,0.55)" strokeWidth={96} strokeLinecap="round" />
+        <path d={LANE} fill="none" stroke="#1D1A19" strokeWidth={86} strokeLinecap="round" />
+        <path d={LANE} fill="none" stroke="rgba(245,240,232,0.8)" strokeWidth={3.5} strokeDasharray="26 22" />
+        <path
+          d={LANE}
+          fill="none"
+          stroke="#D8FF63"
+          strokeWidth={3}
+          strokeDasharray="10 12"
+          strokeLinecap="round"
+          className="route-draw"
+          opacity={0.9}
+          transform="translate(0 16)"
+        />
+
+        {/* trucks */}
+        {reduced ? (
+          <StaticTruck />
+        ) : (
+          <>
+            <MovingTruck begin={-LOOP_S * 0.65} scale={0.8} />
+            <MovingTruck begin={0} scale={1} />
+          </>
+        )}
+      </svg>
+
+      {/* GPS pins: above the road, clear of the logo plate */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         {[
-          { left: "14%", top: "24%", delay: "0s" },
-          { left: "80%", top: "16%", delay: "0.8s" },
-          { left: "86%", top: "46%", delay: "1.4s" },
+          { left: "9%", top: "44%", delay: "0s" },
+          { left: "86%", top: "40%", delay: "0.8s" },
+          { left: "72%", top: "46%", delay: "1.4s" },
         ].map((p) => (
           <span key={p.left} className="gps-pin" style={{ left: p.left, top: p.top }}>
             <span className="gps-ping" style={{ animationDelay: p.delay }} />
@@ -177,85 +251,10 @@ export default function WrepdEnv() {
         ))}
       </div>
 
-      {/* road + route + speed lines + trucks: one coordinate system */}
-      <svg
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full"
-        viewBox="0 0 800 450"
-        preserveAspectRatio="xMidYMax slice"
-      >
-        <defs>
-          <path id="wrepd-lane" d={line(NEAR_LANE, -40, 900)} />
-          <path id="wrepd-lane-far" d={line(FAR_LANE, -40, 900)} />
-        </defs>
-
-        {/* road band */}
-        <polygon
-          points={`-200,${yAt(-200, 0)} 1000,${yAt(1000, 0)} 1000,${yAt(1000, ROAD_THICK)} -200,${yAt(-200, ROAD_THICK)}`}
-          fill="rgba(21,21,21,0.92)"
-        />
-        <polygon
-          points={`-200,${yAt(-200, ROAD_THICK)} 1000,${yAt(1000, ROAD_THICK)} 1000,600 -200,600`}
-          fill="rgba(21,21,21,0.35)"
-        />
-        {/* edge lines */}
-        <path d={line(3)} stroke="rgba(245,240,232,0.55)" strokeWidth={3} />
-        <path d={line(ROAD_THICK - 3)} stroke="rgba(245,240,232,0.55)" strokeWidth={3} />
-        {/* lane dashes */}
-        <path d={line(61)} stroke="rgba(245,240,232,0.85)" strokeWidth={4} strokeDasharray="34 30" />
-        {/* self-drawing lime route along the road centre */}
-        <path
-          d={line(61, -60, 860)}
-          fill="none"
-          stroke="#D8FF63"
-          strokeWidth={3}
-          strokeDasharray="10 12"
-          strokeLinecap="round"
-          className="route-draw"
-          opacity={0.9}
-        />
-
-        {/* ambient speed lines above the road, at the road's angle */}
-        <g stroke="#F5F0E8" strokeLinecap="round" opacity={0.22}>
-          {[-60, -110, -160].map((dy, i) => (
-            <path
-              key={dy}
-              d={line(dy, 40 + i * 120, 300 + i * 120)}
-              strokeWidth={3}
-              strokeDasharray="120 600"
-            >
-              {reduced ? null : (
-                <animate
-                  attributeName="stroke-dashoffset"
-                  from="720"
-                  to="0"
-                  dur={`${3.2 + i * 0.6}s`}
-                  repeatCount="indefinite"
-                />
-              )}
-            </path>
-          ))}
-        </g>
-
-        {/* trucks */}
-        {reduced ? (
-          <g transform={`translate(${midX} ${yAt(midX, NEAR_LANE)}) rotate(${ANGLE}) scale(0.85)`}>
-            <Truck spin={false} />
-          </g>
-        ) : (
-          <>
-            {/* smaller second truck, 40% behind, far lane */}
-            <MovingTruck lane="wrepd-lane-far" begin={-LOOP_S * 0.6} scale={0.72} />
-            <MovingTruck lane="wrepd-lane" begin={0} scale={1} />
-          </>
-        )}
-      </svg>
-
       {/* logo plate — white, matching the logo's own background */}
       <div className="absolute inset-0 flex items-start justify-center pt-[6%]">
         <figure
           className="logo-plate logo-plate--wide border-[rgba(21,21,21,0.25)] bg-white p-2 shadow-[0_26px_70px_rgba(21,21,21,0.35)] sm:p-4"
-          // same share of the stage at every size, so the road keeps clear of it
           style={{ width: "min(37%, 260px)" }}
         >
           <img

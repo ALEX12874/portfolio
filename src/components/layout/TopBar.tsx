@@ -69,18 +69,25 @@ export default function TopBar() {
   };
 
   const light = tone === "ivory"; // light text while over an ink section
+  // touch / small screens: solid bar, no backdrop blur (expensive on phones)
+  const solid = useRef(
+    typeof window !== "undefined" && window.matchMedia("(pointer: coarse), (max-width: 767px)").matches
+  ).current;
+  const blur = scrolled && !solid ? "blur(10px)" : "none";
 
   return (
     <>
       <header
-        className="fixed inset-x-0 top-0 z-[80] transition-[background-color,backdrop-filter] duration-500 ease-editorial"
+        className="fixed inset-x-0 top-0 z-[80] transition-[background-color] duration-500 ease-editorial"
         style={{
           background: scrolled
             ? light
-              ? "rgba(21,21,21,0.72)"
-              : "rgba(245,240,232,0.78)"
+              ? `rgba(21,21,21,${solid ? 0.92 : 0.72})`
+              : `rgba(245,240,232,${solid ? 0.92 : 0.78})`
             : "transparent",
-          backdropFilter: scrolled ? "blur(10px)" : "none",
+          backdropFilter: blur,
+          WebkitBackdropFilter: blur,
+          paddingTop: "env(safe-area-inset-top)",
         }}
       >
         <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-5 sm:px-8 lg:px-12">
@@ -92,7 +99,7 @@ export default function TopBar() {
             }}
             className="group inline-flex items-baseline gap-1.5 font-display text-lg font-extrabold tracking-tight"
             style={{ color: light ? "#F5F0E8" : "#151515" }}
-            aria-label="Gourang Lokwani — back to top"
+            aria-label="Portfolio — Gourang Lokwani, back to top"
           >
             Portfolio
             <span

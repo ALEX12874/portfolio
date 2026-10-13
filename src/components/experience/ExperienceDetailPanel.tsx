@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import type { Experience } from "../../data/experience";
 import CertificateViewer from "./CertificateViewer";
+import { assets } from "../../data/assets";
 import DocumentActions from "./DocumentActions";
 import { lockScroll } from "../../lib/scroll";
 
@@ -90,12 +91,12 @@ export default function ExperienceDetailPanel({
   return (
     <div className="fixed inset-0 z-[95]">
       <div
-        className="absolute inset-0 bg-[rgba(10,10,10,0.72)] backdrop-blur-[3px]"
+        className="absolute inset-0 bg-[rgba(10,10,10,0.8)]"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <motion.div
+      <m.div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -103,10 +104,10 @@ export default function ExperienceDetailPanel({
         initial={{ x: "6%", opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: EASE }}
-        className="absolute inset-y-0 right-0 flex w-full max-w-[88vw] flex-col border-l border-[rgba(245,240,232,0.16)] bg-[#151515] shadow-[-40px_0_120px_rgba(0,0,0,0.55)] lg:max-w-[76vw] xl:max-w-[1180px]"
+        className="absolute inset-y-0 right-0 flex h-[100dvh] w-full flex-col pb-[env(safe-area-inset-bottom)] sm:max-w-[88vw] sm:border-l border-[rgba(245,240,232,0.16)] bg-[#151515] shadow-[-40px_0_120px_rgba(0,0,0,0.55)] lg:max-w-[76vw] xl:max-w-[1180px]"
       >
         {/* sticky company + role */}
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-6 border-b border-[rgba(245,240,232,0.14)] bg-[#151515] px-5 py-5 sm:px-8">
+        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[rgba(245,240,232,0.14)] bg-[#151515] px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:gap-6 sm:px-8 sm:py-5">
           <div className="min-w-0">
             <p className="font-display text-[0.7rem] font-bold uppercase tracking-[0.24em] text-[#E63843]">
               EXPERIENCE {experience.number} / {String(total).padStart(2, "0")}
@@ -137,20 +138,20 @@ export default function ExperienceDetailPanel({
                   <dt className="font-display text-[0.66rem] font-bold uppercase tracking-[0.22em] text-[rgba(245,240,232,0.5)]">
                     Duration
                   </dt>
-                  <dd className="mt-1.5 text-[0.95rem] text-[#F5F0E8]">{experience.duration}</dd>
+                  <dd className="mt-1.5 text-base text-[#F5F0E8] sm:text-[0.95rem]">{experience.duration}</dd>
                 </div>
                 <div>
                   <dt className="font-display text-[0.66rem] font-bold uppercase tracking-[0.22em] text-[rgba(245,240,232,0.5)]">
                     Domain
                   </dt>
-                  <dd className="mt-1.5 text-[0.95rem] text-[#F5F0E8]">{experience.domain}</dd>
+                  <dd className="mt-1.5 text-base text-[#F5F0E8] sm:text-[0.95rem]">{experience.domain}</dd>
                 </div>
               </dl>
 
               <h4 className="mt-6 font-display text-[0.68rem] font-bold uppercase tracking-[0.22em] text-[rgba(245,240,232,0.5)]">
                 Overview
               </h4>
-              <p className="mt-3 text-[0.98rem] leading-relaxed text-[rgba(245,240,232,0.86)]">
+              <p className="mt-3 text-base leading-relaxed text-[rgba(245,240,232,0.86)] sm:text-[0.98rem]">
                 {experience.description}
               </p>
             </div>
@@ -162,7 +163,11 @@ export default function ExperienceDetailPanel({
                   <CertificateViewer certificate={experience.certificate} />
                   <div className="mt-5">
                     <DocumentActions
-                      src={experience.certificate.src}
+                      src={
+                        experience.certificate.src === assets.certHlbs
+                          ? assets.certHlbsOriginal
+                          : experience.certificate.src
+                      }
                       filename={filename}
                       name={`${experience.company} certificate`}
                     />
@@ -211,7 +216,7 @@ export default function ExperienceDetailPanel({
             <ArrowRight size={15} aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-1" />
           </button>
         </footer>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

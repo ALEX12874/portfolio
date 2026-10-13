@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { X } from "lucide-react";
 import { projects } from "../../data/projects";
 import { lockScroll } from "../../lib/scroll";
@@ -63,12 +63,12 @@ export default function WrepdCaseStudy({ open, onClose }: WrepdCaseStudyProps) {
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
       <div
-        className="absolute inset-0 bg-[rgba(21,21,21,0.72)] backdrop-blur-sm"
+        className="absolute inset-0 bg-[rgba(21,21,21,0.82)]"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <motion.div
+      <m.div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -133,7 +133,7 @@ export default function WrepdCaseStudy({ open, onClose }: WrepdCaseStudyProps) {
         <p className="mt-8 text-sm text-[rgba(21,21,21,0.55)]">
           Wrepd is an independent concept project. Press Esc or the close button to return.
         </p>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

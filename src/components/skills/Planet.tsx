@@ -4,6 +4,7 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { Skill } from "../../data/skills";
 import { PLANET_BODIES, PLANET_LAYOUT } from "./planets";
+import { COARSE, NARROW, focus } from "./planets/focus";
 
 interface PlanetProps {
   skill: Skill;
@@ -86,6 +87,12 @@ export default function Planet({
 
     if (spin.current && animate) spin.current.rotation.y += delta * layout.spin;
 
+    // let the camera keep the selected planet centred (portrait canvases)
+    if (selected && root.current) {
+      focus.active = true;
+      focus.position.copy(root.current.position);
+    }
+
     // thin connection line to the core while selected (in world space)
     if (link.current && root.current) {
       link.current.visible = selected;
@@ -140,7 +147,8 @@ export default function Planet({
           onSelect(skill.id);
         }}
       >
-        <sphereGeometry args={[size * 1.35, 16, 12]} />
+        {/* touch: ≥ 1.5 units ≈ 44 px at phone framing */}
+        <sphereGeometry args={[COARSE ? Math.max(size * 1.35, 1.5) : size * 1.35, 16, 12]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
       </mesh>
 
@@ -150,7 +158,7 @@ export default function Planet({
         <meshBasicMaterial color="#D8FF63" transparent opacity={0.45} depthWrite={false} toneMapped={false} />
       </mesh>
 
-      {hovered || selected ? (
+      {(hovered || selected) && !NARROW ? (
         <Html position={[0, size * 1.75 + 0.35, 0]} center zIndexRange={[18, 0]} style={{ pointerEvents: "none" }}>
           <div
             className="whitespace-nowrap rounded-full border border-[rgba(245,240,232,0.25)] bg-[rgba(21,21,21,0.92)] px-3 py-1.5 font-display text-[0.64rem] font-bold uppercase tracking-[0.18em]"

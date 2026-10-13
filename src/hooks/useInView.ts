@@ -61,3 +61,34 @@ export function useActiveInView<T extends HTMLElement>(threshold = 0.05) {
 }
 
 export default useInView;
+
+/**
+ * Latches true once the element comes within `margin` of the viewport —
+ * used to start downloading heavy (3D) chunks just before they're needed.
+ */
+export function useNearViewport<T extends HTMLElement>(margin = "600px") {
+  const ref = useRef<T | null>(null);
+  const [near, setNear] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || near) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: `${margin} 0px ${margin} 0px` }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [margin, near]);
+
+  return { ref, near };
+}
