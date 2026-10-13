@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
@@ -55,6 +55,39 @@ export default function Car({
   const canReact = x < 0;
 
   const brakeBase = useMemo(() => new THREE.Color("#7A1017"), []);
+  const brakeHot = useMemo(() => new THREE.Color("#FF3040"), []);
+
+  // automotive paint: clearcoat over a slightly metallic base (reads as
+  // paint, not a flat block of colour)
+  const paint = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color,
+        roughness: 0.35,
+        metalness: 0.25,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.12,
+      }),
+    [color]
+  );
+  const glass = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: "#1D2329",
+        roughness: 0.08,
+        metalness: 0.2,
+        clearcoat: 1,
+        clearcoatRoughness: 0.05,
+      }),
+    []
+  );
+  useEffect(
+    () => () => {
+      paint.dispose();
+      glass.dispose();
+    },
+    [paint, glass]
+  );
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -64,7 +97,9 @@ export default function Car({
 
     if (group.current) {
       group.current.position.z = z;
-      group.current.rotation.y = dir === 1 ? 0 : Math.PI;
+      // the model's nose is local +z: face the direction of travel
+      // (dir 1 moves toward -z, dir -1 toward +z)
+      group.current.rotation.y = dir === 1 ? Math.PI : 0;
 
       // seamless loop: grow in from the fogged far end, shrink out behind us
       const fromFar = THREE.MathUtils.clamp((z - Z_FAR) / 10, 0, 1);
@@ -77,10 +112,10 @@ export default function Car({
       if (canReact) {
         const d = (z - BILLBOARD_Z) / REACT_WINDOW;
         const g = Math.max(0, 1 - d * d); // 0 far, 1 abeam the board
-        const side = dir === 1 ? -1 : 1; // drift toward kerb (-x world side)
-        group.current.position.x = x + side * -0.3 * g;
-        group.current.rotation.y +=
-          (dir === 1 ? 1 : -1) * 0.07 * g * (side === -1 ? 1 : -1);
+        // ease toward the kerb (-x, the footpath on the driver's left) and
+        // turn the nose a touch toward the board (also on the -x side)
+        group.current.position.x = x - 0.3 * g;
+        group.current.rotation.y += 0.07 * g;
       }
     }
 
@@ -89,12 +124,13 @@ export default function Car({
       const d = (z - BILLBOARD_Z) / REACT_WINDOW;
       const g = canReact ? Math.max(0, 1 - d * d) : 0;
       brake.current.emissiveIntensity = 0.25 + g * 2.6;
-      brake.current.color.copy(brakeBase).lerp(new THREE.Color("#FF3040"), g);
+      brake.current.color.copy(brakeBase).lerp(brakeHot, g);
     }
 
     const spin = t * loopRate(speed * 1.6);
     wheels.current.forEach((w) => {
-      if (w) w.rotation.x = dir === 1 ? spin : -spin;
+      // local frame: the car always moves along its own +z → roll forward
+      if (w) w.rotation.x = spin;
     });
   });
 
@@ -106,7 +142,7 @@ export default function Car({
   ];
 
   return (
-    <group ref={group} position={[x, 0, Z_FAR]}>
+    <group ref={group} name={`car-${color}`} position={[x, 0, Z_FAR]}>
       {/* lower body */}
       <RoundedBox
         args={[1.62, 0.5, bodyLen]}
@@ -115,10 +151,10 @@ export default function Car({
         position={[0, 0.55, 0]}
         castShadow
       >
-        <meshStandardMaterial color={color} roughness={0.38} metalness={0.3} />
+        <primitive object={paint} attach="material" />
       </RoundedBox>
 
-      {/* hood step (front = +z in local space; group flips for dir) */}
+      {/* hood step (front = +z in local space; the group turns to face travel) */}
       <RoundedBox
         args={[1.5, 0.24, bodyLen * 0.34]}
         radius={0.09}
@@ -126,7 +162,7 @@ export default function Car({
         position={[0, 0.82, bodyLen * 0.31]}
         castShadow
       >
-        <meshStandardMaterial color={color} roughness={0.34} metalness={0.32} />
+        <primitive object={paint} attach="material" />
       </RoundedBox>
 
       {/* trunk step */}
@@ -137,7 +173,7 @@ export default function Car({
         position={[0, 0.81, -bodyLen * 0.35]}
         castShadow
       >
-        <meshStandardMaterial color={color} roughness={0.34} metalness={0.32} />
+        <primitive object={paint} attach="material" />
       </RoundedBox>
 
       {/* cabin */}
@@ -148,8 +184,16 @@ export default function Car({
         position={[0, 1.0, cabinOffset]}
         castShadow
       >
-        <meshStandardMaterial color={color} roughness={0.3} metalness={0.35} />
+        <primitive object={paint} attach="material" />
       </RoundedBox>
+
+      {/* thin chrome trim along both flanks */}
+      {[-0.815, 0.815].map((tx) => (
+        <mesh key={`trim-${tx}`} position={[tx, 0.74, 0]}>
+          <boxGeometry args={[0.02, 0.035, bodyLen * 0.78]} />
+          <meshStandardMaterial color="#D6D8DC" roughness={0.15} metalness={1} />
+        </mesh>
+      ))}
 
       {/* glass house — slightly narrower so a body-colour pillar frames it */}
       <RoundedBox
@@ -158,11 +202,7 @@ export default function Car({
         smoothness={3}
         position={[0, 1.05, cabinOffset]}
       >
-        <meshStandardMaterial
-          color="#22262B"
-          roughness={0.12}
-          metalness={0.6}
-        />
+        <primitive object={glass} attach="material" />
       </RoundedBox>
 
       {/* headlights */}
@@ -199,13 +239,19 @@ export default function Car({
             if (node) wheels.current[i] = node;
           }}
         >
+          {/* rubber tyre */}
           <mesh rotation-z={Math.PI / 2} castShadow>
             <cylinderGeometry args={[0.31, 0.31, 0.24, 18]} />
-            <meshStandardMaterial color="#151515" roughness={0.85} />
+            <meshStandardMaterial color="#1C1C1E" roughness={0.9} />
           </mesh>
+          {/* silver rim + hub spoke (shows the roll direction) */}
           <mesh rotation-z={Math.PI / 2}>
-            <cylinderGeometry args={[0.15, 0.15, 0.26, 14]} />
-            <meshStandardMaterial color="#CFC7B9" roughness={0.45} metalness={0.55} />
+            <cylinderGeometry args={[0.17, 0.17, 0.26, 16]} />
+            <meshStandardMaterial color="#C9CCD1" roughness={0.25} metalness={0.9} />
+          </mesh>
+          <mesh>
+            <boxGeometry args={[0.27, 0.05, 0.3]} />
+            <meshStandardMaterial color="#8E949B" roughness={0.3} metalness={0.9} />
           </mesh>
         </group>
       ))}
@@ -213,7 +259,7 @@ export default function Car({
       {/* soft contact shadow (complements the shadow map at grazing angles) */}
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, 0]}>
         <planeGeometry args={[1.9, bodyLen + 0.4]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.14} depthWrite={false} />
+        <meshBasicMaterial color="#151515" transparent opacity={0.16} depthWrite={false} />
       </mesh>
     </group>
   );

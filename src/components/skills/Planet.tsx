@@ -15,6 +15,9 @@ interface PlanetProps {
   onSelect: (id: string) => void;
 }
 
+/** Below the desktop layout the chip rail + info card carry the title. */
+const NARROW = typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+
 const cameraDir = new THREE.Vector3();
 const tmp = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -53,7 +56,7 @@ export default function Planet({
     const t = clock.getElapsedTime();
     if (born.current < 0) born.current = t;
 
-    const a = skill.phase + (animate ? t * layout.orbitSpeed : 0);
+    const a = layout.phase + (animate ? t * layout.orbitSpeed : 0);
     const r = layout.orbitRadius;
     const incl = layout.inclination;
 
@@ -150,7 +153,7 @@ export default function Planet({
         <meshBasicMaterial color="#D8FF63" transparent opacity={0.45} depthWrite={false} toneMapped={false} />
       </mesh>
 
-      {hovered || selected ? (
+      {(hovered || selected) && !NARROW ? (
         <Html position={[0, size * 1.75 + 0.35, 0]} center zIndexRange={[18, 0]} style={{ pointerEvents: "none" }}>
           <div
             className="whitespace-nowrap rounded-full border border-[rgba(245,240,232,0.25)] bg-[rgba(21,21,21,0.92)] px-3 py-1.5 font-display text-[0.64rem] font-bold uppercase tracking-[0.18em]"

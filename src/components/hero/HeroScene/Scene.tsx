@@ -97,17 +97,23 @@ function FrameGuard({ onLowFps }: { onLowFps?: () => void }) {
 }
 
 /**
- * Traffic layout: three cars per lane at equal lane speed with thirds-phase
- * offsets, so cars inside a lane can never collide. Palette-derived colours
- * only (ivory / sand / ink / signature red).
+ * Traffic (left-hand, as in India): the near lane (x −1.7, beside the
+ * footpath) drives toward −z with the footpath on the drivers' left; the far
+ * lane (x +1.7) drives the opposite way. Three cars per lane at equal speed
+ * with thirds-phase offsets, so cars in a lane can never collide.
+ *
+ * Paint: each colour used once, light/dark alternating within a lane, no two
+ * neighbours alike. The red car is clearcoat paint, never a flat billboard red.
  */
 const CARS = [
-  { color: "#F5F0E8", x: -1.7, dir: 1 as const, speed: 6.4, offset: 0, variant: "sedan" as const },
-  { color: "#E63843", x: -1.7, dir: 1 as const, speed: 6.4, offset: 1 / 3, variant: "hatch" as const },
-  { color: "#E7E1D6", x: -1.7, dir: 1 as const, speed: 6.4, offset: 2 / 3, variant: "sedan" as const },
-  { color: "#151515", x: 1.7, dir: -1 as const, speed: 5.4, offset: 0, variant: "hatch" as const },
-  { color: "#F5F0E8", x: 1.7, dir: -1 as const, speed: 5.4, offset: 1 / 3, variant: "sedan" as const },
-  { color: "#E7E1D6", x: 1.7, dir: -1 as const, speed: 5.4, offset: 2 / 3, variant: "sedan" as const },
+  // near lane: light · dark · light
+  { color: "#F5F0E8", x: -1.7, dir: 1 as const, speed: 6.4, offset: 0, variant: "sedan" as const }, // Pearl White
+  { color: "#2A2A2D", x: -1.7, dir: 1 as const, speed: 6.4, offset: 1 / 3, variant: "hatch" as const }, // Graphite
+  { color: "#CDB88F", x: -1.7, dir: 1 as const, speed: 6.4, offset: 2 / 3, variant: "sedan" as const }, // Champagne Sand
+  // far lane: dark · light · dark
+  { color: "#E63843", x: 1.7, dir: -1 as const, speed: 5.4, offset: 0, variant: "hatch" as const }, // Signature Red
+  { color: "#5C6B7A", x: 1.7, dir: -1 as const, speed: 5.4, offset: 1 / 3, variant: "sedan" as const }, // Steel Blue-Grey
+  { color: "#1F4D3A", x: 1.7, dir: -1 as const, speed: 5.4, offset: 2 / 3, variant: "sedan" as const }, // Forest Green
 ];
 
 /**

@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --force",
     "preview": "vite preview",
-    "seo": "node scripts/generate-seo.mjs"
+    "seo": "node scripts/generate-seo.mjs",
+    "test:contact": "node scripts/test-contact.mjs"
   },
   "dependencies": {
     "@fontsource/archivo": "^5.1.0",

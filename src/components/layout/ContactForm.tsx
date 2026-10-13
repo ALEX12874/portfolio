@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { LIMITS, mailtoFallback, sendEnquiry } from "../../lib/sendEnquiry";
+import { LIMITS, enquiryText, mailtoFallback, sendEnquiry, type FailReason } from "../../lib/sendEnquiry";
 
 type FieldName = "name" | "phone" | "email" | "message";
 type Values = Record<FieldName, string>;
@@ -14,10 +14,10 @@ interface ContactFormProps {
 
 const EMPTY: Values = { name: "", phone: "", email: "", message: "" };
 const ORDER: FieldName[] = ["name", "phone", "email", "message"];
-const MIN_FILL_MS = 3000;
-const COOLDOWN_MS = 30000;
+// only after a successful send (the honeypot is the spam guard)
+const COOLDOWN_MS = 10000;
 const COOLDOWN_KEY = "contact:lastSentAt";
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validate(v: Values): Errors {
   const e: Errors = {};
@@ -26,9 +26,11 @@ function validate(v: Values): Errors {
   else if (name.length < 2) e.name = "Name looks too short.";
 
   const phone = v.phone.trim();
-  const digits = phone.replace(/\D/g, "").length;
+  // accept "+91 98765 43210", "(0141) 234-5678", "98765.43210" …
+  const compact = phone.replace(/[\s\-().]/g, "");
+  const digits = compact.replace(/\D/g, "").length;
   if (!phone) e.phone = "Please enter your phone number.";
-  else if (!/^[0-9+\-\s()]+$/.test(phone)) e.phone = "Use digits, spaces, +, - or ( ) only.";
+  else if (!/^\+?\d+$/.test(compact)) e.phone = "Use digits, with an optional + at the start.";
   else if (digits < 7 || digits > 15) e.phone = "Phone number should have 7–15 digits.";
 
   const email = v.email.trim();
@@ -72,11 +74,13 @@ export default function ContactForm({ email }: ContactFormProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
   const [status, setStatus] = useState<Status>("idle");
   const [notice, setNotice] = useState("");
+  const [failReason, setFailReason] = useState<FailReason>("network");
+  const [failDetail, setFailDetail] = useState("");
+  const [copied, setCopied] = useState(false);
   const [sentName, setSentName] = useState("");
   const [lastSentAt, setLastSentAt] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
-  const startedAt = useRef(Date.now());
   const honeypot = useRef<HTMLInputElement | null>(null);
   const fields = useRef<Partial<Record<FieldName, HTMLInputElement | HTMLTextAreaElement | null>>>({});
   const statusRef = useRef<HTMLDivElement | null>(null);
@@ -133,10 +137,6 @@ export default function ContactForm({ email }: ContactFormProps) {
 
     const t = Date.now();
     setNow(t);
-    if (t - startedAt.current < MIN_FILL_MS) {
-      setNotice("That was quick — please give it a second and submit again.");
-      return;
-    }
     if (lastSentAt && t - lastSentAt < COOLDOWN_MS) {
       setNotice(`Please wait ${Math.ceil((lastSentAt + COOLDOWN_MS - t) / 1000)}s before sending another message.`);
       return;
@@ -153,8 +153,28 @@ export default function ContactForm({ email }: ContactFormProps) {
       setSentName(values.name.trim().split(/\s+/)[0] ?? "");
       setStatus("success");
     } else {
+      setFailReason(result.reason);
+      setFailDetail(result.detail ?? "");
       setStatus("error");
     }
+  };
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(enquiryText(values));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const failCopy: Record<FailReason, string> = {
+    config: "Couldn't send automatically — the form isn't connected yet.",
+    offline: "You seem to be offline, so I couldn't send it.",
+    timeout: "Couldn't send — the mail service took too long to answer.",
+    rejected: `Couldn't send — the mail service said: ${failDetail || "request rejected"}.`,
+    network: "Couldn't send automatically — the connection to the mail service failed.",
   };
 
   const sendAnother = () => {
@@ -162,7 +182,6 @@ export default function ContactForm({ email }: ContactFormProps) {
     setErrors({});
     setTouched({});
     setNotice("");
-    startedAt.current = Date.now();
     setStatus("idle");
     window.setTimeout(() => fields.current.name?.focus(), 0);
   };
@@ -342,16 +361,30 @@ export default function ContactForm({ email }: ContactFormProps) {
             {/* form-level messages */}
             <div ref={status === "error" ? statusRef : undefined} tabIndex={-1} aria-live="polite" className="focus:outline-none">
               {status === "error" ? (
-                <p role="alert" className="rounded-xl border border-[rgba(230,56,67,0.35)] bg-[rgba(230,56,67,0.08)] px-4 py-3 text-sm font-medium leading-relaxed text-[#B3202B]">
-                  Couldn&apos;t send. Please try again, or email me directly at{" "}
-                  <a
-                    href={mailtoFallback(email, values)}
-                    className="font-semibold underline decoration-2 underline-offset-2 hover:text-[#151515]"
-                  >
-                    {email}
-                  </a>
-                  .
-                </p>
+                <div
+                  role="alert"
+                  className="rounded-xl border border-[rgba(230,56,67,0.35)] bg-[rgba(230,56,67,0.08)] px-4 py-3 text-sm font-medium leading-relaxed text-[#B3202B]"
+                >
+                  <p>{failCopy[failReason]} Your message is still here.</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href={mailtoFallback(email, values)}
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#151515] px-4 font-display text-[0.82rem] font-bold text-[#F5F0E8] hover:bg-[#E63843] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E63843] focus-visible:ring-offset-2"
+                    >
+                      Email me instead
+                    </a>
+                    <button
+                      type="button"
+                      onClick={copyMessage}
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(21,21,21,0.25)] px-4 font-display text-[0.82rem] font-bold text-[#151515] hover:border-[#151515] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E63843] focus-visible:ring-offset-2"
+                    >
+                      {copied ? "Copied" : "Copy my message"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-[rgba(21,21,21,0.6)]">
+                    Or write to <span className="font-semibold">{email}</span>.
+                  </p>
+                </div>
               ) : notice ? (
                 <p className="text-sm font-medium text-[rgba(21,21,21,0.75)]">{notice}</p>
               ) : cooldownLeft > 0 ? (

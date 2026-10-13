@@ -8,45 +8,51 @@ interface CameraControlsProps {
   enabled: boolean;
 }
 
-const ELEV_MIN = 0.18;
-const ELEV_MAX = 0.95;
-/** Default framing: ~23° top-down tilt. */
-const ELEV_DEFAULT = 0.4;
-/** Share of the canvas width the outer orbit spans. */
-const FILL = 0.88;
+/**
+ * Locked elevation: orbit rings read as ellipses with a short/long axis ratio
+ * of sin(38°) ≈ 0.62 (polar angle ≈ 52° from vertical) — the reference view.
+ * The same angle on every device; only the distance adapts to the canvas.
+ */
+export const ELEVATION = THREE.MathUtils.degToRad(38);
+/** Default azimuth of the reference view. */
+const AZ_DEFAULT = 0.35;
+/** Ease back to AZ_DEFAULT this long after the last drag. */
+const RETURN_AFTER_MS = 4000;
+/** Outer orbit share of the canvas: width on portrait, height on landscape. */
+const FILL_PORTRAIT_W = 0.92;
+const FILL_LANDSCAPE_H = 0.88;
+/** Headroom for planet bodies/rings sticking out of the outer orbit. */
+const PLANET_MARGIN = 1.6;
 
 /**
- * Lightweight drag-to-orbit camera with damping, polar-angle limits and no
- * zoom (so page scrolling is never hijacked).
- *
- * The canvas wrapper uses `touch-action: pan-y`, so vertical swipes scroll the
- * page; horizontal drags orbit. Vertical deltas from a touch pointer are only
- * applied when the gesture is horizontal-dominant.
+ * Drag rotates the system around the vertical axis only (azimuth, damped);
+ * elevation never changes, there is no zoom or pan, so page scrolling is
+ * never hijacked. The wrapper uses `touch-action: pan-y`: vertical swipes
+ * scroll the page, horizontal drags rotate.
  */
 export default function CameraControls({ enabled }: CameraControlsProps) {
   const { camera, gl } = useThree();
   const state = useRef({
-    az: 0.35,
-    targetAz: 0.35,
-    el: ELEV_DEFAULT,
-    targetEl: ELEV_DEFAULT,
+    az: AZ_DEFAULT,
+    targetAz: AZ_DEFAULT,
     dragging: false,
     lastX: 0,
     lastY: 0,
     dominantX: true,
+    releasedAt: 0,
   });
 
   useEffect(() => {
     const el = gl.domElement;
     el.style.touchAction = "pan-y";
-
     if (!enabled) return;
 
     const onDown = (e: PointerEvent) => {
-      state.current.dragging = true;
-      state.current.lastX = e.clientX;
-      state.current.lastY = e.clientY;
-      state.current.dominantX = true;
+      const s = state.current;
+      s.dragging = true;
+      s.lastX = e.clientX;
+      s.lastY = e.clientY;
+      s.dominantX = true;
     };
 
     const onMove = (e: PointerEvent) => {
@@ -56,27 +62,21 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
       const dy = e.clientY - s.lastY;
       s.lastX = e.clientX;
       s.lastY = e.clientY;
-
-      const isTouch = e.pointerType === "touch";
-      if (isTouch) {
-        // only horizontal-dominant gestures orbit; otherwise the browser scrolls
+      if (e.pointerType === "touch") {
+        // only horizontal-dominant gestures rotate; otherwise the page scrolls
         if (Math.abs(dx) <= Math.abs(dy)) {
           s.dominantX = false;
           return;
         }
         if (!s.dominantX) return;
       }
-
       s.targetAz -= dx * 0.006;
-      s.targetEl = THREE.MathUtils.clamp(
-        s.targetEl + (isTouch ? 0 : dy * 0.004),
-        ELEV_MIN,
-        ELEV_MAX
-      );
     };
 
     const onUp = () => {
-      state.current.dragging = false;
+      const s = state.current;
+      if (s.dragging) s.releasedAt = performance.now();
+      s.dragging = false;
     };
 
     el.addEventListener("pointerdown", onDown);
@@ -93,24 +93,35 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
 
   useFrame(() => {
     const s = state.current;
+
+    // drift back to the reference azimuth after a few idle seconds
+    if (!s.dragging && s.releasedAt && performance.now() - s.releasedAt > RETURN_AFTER_MS) {
+      // shortest way round
+      const turns = Math.round((s.targetAz - AZ_DEFAULT) / (Math.PI * 2));
+      s.targetAz = THREE.MathUtils.lerp(s.targetAz, AZ_DEFAULT + turns * Math.PI * 2, 0.04);
+      if (Math.abs(s.targetAz - (AZ_DEFAULT + turns * Math.PI * 2)) < 0.001) {
+        s.targetAz = AZ_DEFAULT;
+        s.az = AZ_DEFAULT + (s.az - (AZ_DEFAULT + turns * Math.PI * 2));
+        s.releasedAt = 0;
+      }
+    }
     s.az = THREE.MathUtils.lerp(s.az, s.targetAz, 0.07);
-    s.el = THREE.MathUtils.lerp(s.el, s.targetEl, 0.07);
 
     const cam = camera as THREE.PerspectiveCamera;
     const aspect = cam.aspect || 1.6;
     const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
 
-    // fit: the orbit's left/right extremes sit at the Sun's depth, so the
-    // outer orbit spans FILL of the width; the tilted ellipse (+ planet
-    // headroom) must also fit vertically when the user drags it steeper.
-    // portrait canvases get a little extra margin for the near-side bulge
-    const halfW = OUTER_ORBIT / (aspect < 1.2 ? FILL - 0.08 : FILL);
-    const halfH = (OUTER_ORBIT * Math.sin(s.el) + 2.4) / 0.9;
+    // Fit (recomputed every frame, so resize / rotation just works):
+    // - width: the orbit's left/right extremes sit at the Sun's depth
+    // - height: the tilted ellipse (minor half-axis R·sin e) + planet headroom
+    const R = OUTER_ORBIT + PLANET_MARGIN;
+    const portrait = aspect < 1;
+    const halfW = R / (portrait ? FILL_PORTRAIT_W : 0.9);
+    const halfH = (OUTER_ORBIT * Math.sin(ELEVATION) + PLANET_MARGIN) / (portrait ? 0.9 : FILL_LANDSCAPE_H);
     const distance = Math.max(halfW / (tanV * aspect), halfH / tanV);
 
-    const y = Math.sin(s.el) * distance;
-    const horizontal = Math.cos(s.el) * distance;
-
+    const y = Math.sin(ELEVATION) * distance;
+    const horizontal = Math.cos(ELEVATION) * distance;
     camera.position.set(Math.sin(s.az) * horizontal, y, Math.cos(s.az) * horizontal);
     camera.lookAt(0, 0, 0);
   });
