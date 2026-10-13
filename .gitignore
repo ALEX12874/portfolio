@@ -1,0 +1,19 @@
+# dependencies & build output
+node_modules
+dist
+*.tsbuildinfo
+
+# environment — never commit real keys
+.env
+.env.local
+.env.*.local
+
+# hosting / tooling
+.vercel
+.claude
+.toolchain
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

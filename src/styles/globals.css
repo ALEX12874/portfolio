@@ -1,0 +1,685 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------- base */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+section[id] {
+  scroll-margin-top: 72px;
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+/* -------------------------------------------------- focus rings */
+:where(a, button, [tabindex], input, select, textarea):focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.on-ink :where(a, button, [tabindex]):focus-visible {
+  outline-color: var(--lime);
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -80px;
+  z-index: 200;
+  background: var(--ink);
+  color: var(--ivory);
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: top var(--dur-fast) var(--ease-editorial);
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+/* ------------------------------------------------- typography */
+.display {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  line-height: 0.92;
+  margin: 0;
+}
+
+.h2 {
+  font-size: var(--size-h2);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--size-eyebrow);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 34px;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.muted-lead {
+  color: var(--ink-70);
+}
+
+/* ------------------------------------------ dotted backgrounds */
+.dots-ivory {
+  background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(21, 21, 21, 0.1) 1px,
+      transparent 0
+    ),
+    radial-gradient(circle at 1px 1px, rgba(230, 56, 67, 0.28) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(216, 255, 99, 0.5) 1px, transparent 0);
+  background-size: 26px 26px, 156px 156px, 208px 208px;
+  background-position: 0 0, 42px 64px, 130px 18px;
+}
+
+.dots-ink {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(245, 240, 232, 0.08) 1px,
+    transparent 0
+  );
+  background-size: 26px 26px;
+}
+
+/* --------------------------------------------- misc utilities */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: none;
+  transition: transform var(--dur-fast) var(--ease-editorial),
+    background-color var(--dur-fast) var(--ease-editorial),
+    color var(--dur-fast) var(--ease-editorial),
+    box-shadow var(--dur-fast) var(--ease-editorial);
+}
+
+.pill-ink {
+  background: var(--ink);
+  color: var(--ivory);
+  padding: 15px 28px;
+}
+
+.pill-ink:hover {
+  background: var(--red);
+}
+
+.pill-ink:active {
+  transform: scale(0.97);
+}
+
+.icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--ink-10);
+  box-shadow: 0 8px 24px rgba(21, 21, 21, 0.1);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-editorial),
+    background-color var(--dur-fast) var(--ease-editorial),
+    color var(--dur-fast) var(--ease-editorial);
+}
+
+.icon-circle:hover {
+  background: var(--ink);
+  color: var(--ivory);
+  transform: translateY(-3px);
+}
+
+/* Highlighter marker behind key hero phrases */
+.marker {
+  position: relative;
+  display: inline;
+  color: var(--ink);
+  background-color: transparent;
+  background-image: linear-gradient(var(--lime), var(--lime));
+  background-repeat: no-repeat;
+  background-position: 0 88%;
+  background-size: 0% 42%;
+  padding: 0 0.12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.marker.is-lit {
+  animation: marker-wipe 620ms var(--ease-editorial) 900ms forwards;
+}
+
+/* 2.5D fallback — CSS-animated cars and walkers */
+.fb-car {
+  position: absolute;
+  left: 0;
+  width: 74px;
+  height: 20px;
+  border-radius: 7px 12px 4px 4px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  animation-name: fb-drive;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.fb-car::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: -7px;
+  width: 34px;
+  height: 10px;
+  border-radius: 6px 8px 0 0;
+  background: inherit;
+  filter: brightness(0.9);
+}
+
+@keyframes fb-drive {
+  from {
+    transform: translateX(120vw);
+  }
+  to {
+    transform: translateX(-30vw);
+  }
+}
+
+.fb-walker {
+  position: absolute;
+  animation-name: fb-walk;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes fb-walk {
+  from {
+    transform: translateX(115%);
+  }
+  to {
+    transform: translateX(-860%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-car,
+  .fb-walker {
+    animation: none;
+  }
+}
+
+@keyframes marker-wipe {
+  from {
+    background-size: 0% 42%;
+  }
+  to {
+    background-size: 100% 42%;
+  }
+}
+
+/* ------------------------------------------------ reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .marker {
+    background-size: 100% 42%;
+  }
+}
+
+/* perspectives: per-card editorial details */
+.context-squiggle {
+  position: relative;
+  display: inline-block;
+}
+
+.context-squiggle::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 5px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='6'><path d='M0 3 Q6 0 12 3 T24 3' stroke='%23D8FF63' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 24px 6px;
+}
+
+.dot-light {
+  transition: background-color 450ms var(--ease-editorial), transform 450ms var(--ease-editorial);
+}
+
+.group:hover .dot-light {
+  background-color: var(--lime);
+  transform: translateY(-2px);
+}
+
+/* -------------------------------- projects: brand environments */
+.logo-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(52%, 260px);
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  border: 1px solid rgba(21, 21, 21, 0.2);
+  overflow: hidden;
+}
+
+.logo-plate--wide {
+  aspect-ratio: 3 / 2;
+}
+
+/* ---- LogoSlab3D: logo as the face of a thick bevelled slab ---- */
+.logo-slab {
+  position: relative;
+  /* ~68% of the stage height, never wider than 80% of the stage */
+  width: var(--slab, min(68cqh, 80cqw));
+  aspect-ratio: 1 / 1;
+  perspective: 1100px;
+}
+
+.logo-slab__floor {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -9%;
+  height: 12%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  filter: blur(6px);
+  animation: slab-floor 6s ease-in-out infinite;
+}
+
+.logo-slab__float {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: slab-float 6s ease-in-out infinite;
+}
+
+.logo-slab__tilt {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.logo-slab__layer,
+.logo-slab__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 15%;
+}
+
+/* edge layers: warm ivory metal, shaded darker toward the back */
+.logo-slab__layer {
+  background: linear-gradient(135deg, #efe6d6 0%, #d8c9ad 55%, #b9a785 100%);
+}
+
+/* the bezel: cream → warm-ivory metal, light top-left, dark bottom-right */
+.logo-slab__face {
+  overflow: hidden;
+  background: linear-gradient(135deg, #fffaf0 0%, #f5f0e8 22%, #e9dfcb 52%, #d6c6a6 78%, #c2ae8a 100%);
+  box-shadow:
+    inset 3px 3px 2px rgba(255, 255, 255, 0.95),
+    inset -4px -4px 6px rgba(110, 88, 56, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.4),
+    0 26px 50px rgba(0, 0, 0, 0.42);
+}
+
+/* the artwork well: chamfered edge (dark top-left, light bottom-right) */
+.logo-slab__well {
+  position: absolute;
+  inset: 7.5%;
+  border-radius: 9%;
+  overflow: hidden;
+  box-shadow:
+    -2px -2px 1px rgba(120, 98, 64, 0.55),
+    2px 2px 1px rgba(255, 255, 255, 0.85);
+}
+
+.logo-slab__well img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+/* inner shadow where the bezel meets the logo */
+.logo-slab__inset {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.5),
+    inset 3px 0 8px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+/* faint light sweep — painted on the bevel ring only (well masked out) */
+.logo-slab__sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 7.5%;
+  background: linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0) 38%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(255, 255, 255, 0) 62%
+    )
+    no-repeat;
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  mix-blend-mode: soft-light;
+  animation: slab-sweep 7s ease-in-out infinite;
+}
+
+@keyframes slab-float {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes slab-floor {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes slab-sweep {
+  0%,
+  35% {
+    background-position: 130% 0;
+  }
+  75%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+.logo-slab--static .logo-slab__float,
+.logo-slab--static .logo-slab__floor,
+.logo-slab--static .logo-slab__sweep {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-slab__float,
+  .logo-slab__floor,
+  .logo-slab__sweep {
+    animation: none;
+  }
+}
+
+.leaf-drift {
+  animation: leaf-drift 11s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes leaf-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(8px, -12px) rotate(8deg);
+  }
+}
+
+.speed-line {
+  position: absolute;
+  left: 0;
+  width: 34%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  animation: speed-sweep 4.6s linear infinite;
+}
+
+@keyframes speed-sweep {
+  from {
+    transform: translateX(-40vw);
+  }
+  to {
+    transform: translateX(120vw);
+  }
+}
+
+.gps-pin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+}
+
+.gps-dot {
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: #f5f0e8;
+}
+
+.gps-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1.5px solid rgba(245, 240, 232, 0.9);
+  animation: gps-ping 2.8s ease-out infinite;
+}
+
+@keyframes gps-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+.route-draw,
+.link-draw {
+  animation: dash-flow 3.4s linear infinite;
+}
+
+.sprig-draw {
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: draw-in 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes draw-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -160;
+  }
+}
+
+.truck-run {
+  animation: truck-run 13s linear infinite;
+}
+
+@keyframes truck-run {
+  from {
+    transform: translateX(-46%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+.order-chip {
+  position: absolute;
+  left: 4%;
+  top: -26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #d8ff63;
+  color: #151515;
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  animation: chip-travel 6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes chip-travel {
+  0%,
+  8% {
+    left: 2%;
+    opacity: 0;
+  }
+  16% {
+    opacity: 1;
+  }
+  50% {
+    left: 46%;
+    opacity: 1;
+  }
+  84% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    left: 90%;
+    opacity: 0;
+  }
+}
+
+.module-chip {
+  flex: 1 1 0;
+  max-width: 10.5rem;
+}
+
+.qr-motif {
+  position: absolute;
+  right: 4%;
+  bottom: 6%;
+  width: clamp(64px, 12%, 110px);
+  height: auto;
+  opacity: 0.5;
+}
+
+.fragrance-dot {
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(245, 240, 232, 0.75);
+  animation: fragrance-drift 9s ease-in-out infinite;
+}
+
+@keyframes fragrance-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate(10px, -26px);
+    opacity: 0.85;
+  }
+}
+
+/* --------------------------------------------- scrollbar (desktop) */
+@media (min-width: 1024px) {
+  body::-webkit-scrollbar {
+    width: 10px;
+  }
+  body::-webkit-scrollbar-track {
+    background: var(--ivory);
+  }
+  body::-webkit-scrollbar-thumb {
+    background: var(--ink-15);
+    border-radius: 999px;
+  }
+  body::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-40);
+  }
+}
