@@ -39,9 +39,22 @@ export default function SynkkEnv() {
         ))}
       </svg>
 
-      {/* modules + connecting lines + travelling order chip */}
-      <div className="absolute inset-0 flex items-center justify-center px-[6%]">
-        <div className="relative flex w-full max-w-[46rem] items-center justify-between gap-3 sm:gap-6">
+      {/* one column — logo (top) → workflow row (bottom): they can never overlap */}
+      <div className="synkk-stage">
+        {/* logo plate — the logo keeps its own black field */}
+        <figure className="logo-plate synkk-logo border-[rgba(216,255,99,0.35)] bg-black p-2.5 shadow-[0_26px_70px_rgba(0,0,0,0.6)] sm:p-4">
+          <img
+            src={assets.logoSynkk}
+            alt="Synkk logo"
+            width={1080}
+            height={1080}
+            decoding="async"
+            className="h-full w-full object-contain"
+          />
+        </figure>
+
+        {/* modules + connecting lines + travelling order chip (all relative to the row) */}
+        <div className="synkk-row relative flex w-full max-w-[46rem] items-center justify-between">
           <svg
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 h-full w-full"
@@ -55,13 +68,13 @@ export default function SynkkEnv() {
           {MODULES.map((m, i) => (
             <div
               key={m}
-              className="module-chip relative z-10 rounded-lg border border-[rgba(216,255,99,0.4)] bg-[#0A0A0A] px-3 py-3 text-center sm:px-5"
+              className="module-chip relative z-10 rounded-lg border border-[rgba(216,255,99,0.4)] bg-[#0A0A0A] px-2 py-2.5 text-center sm:px-5 sm:py-3"
               style={{ animationDelay: `${i * 0.15}s` }}
             >
-              <span className="block font-display text-[0.6rem] font-extrabold uppercase tracking-[0.2em] text-[#D8FF63] sm:text-[0.72rem]">
+              <span className="block font-display text-[0.6rem] font-extrabold uppercase tracking-[0.16em] text-[#D8FF63] sm:text-[0.7rem] sm:tracking-[0.2em]">
                 {m}
               </span>
-              <span className="mt-1 block font-body text-[0.55rem] tracking-[0.12em] text-[rgba(245,240,232,0.5)] sm:text-[0.62rem]">
+              <span className="module-sub mt-1 block font-body text-[0.55rem] tracking-[0.12em] text-[rgba(245,240,232,0.5)] sm:text-[0.62rem]">
                 {i === 0 ? "QR ORDER" : i === 1 ? "LIVE DASH" : "DONE"}
               </span>
             </div>
@@ -71,20 +84,6 @@ export default function SynkkEnv() {
             ORDER
           </span>
         </div>
-      </div>
-
-      {/* logo plate — the logo keeps its own black field */}
-      <div className="absolute inset-x-0 top-[10%] flex justify-center">
-        <figure className="logo-plate border-[rgba(216,255,99,0.35)] bg-black p-3 shadow-[0_26px_70px_rgba(0,0,0,0.6)] sm:p-4">
-          <img
-            src={assets.logoSynkk}
-            alt="Synkk logo"
-            width={1080}
-            height={1080}
-            decoding="async"
-            className="h-full w-full object-contain"
-          />
-        </figure>
       </div>
     </div>
   );

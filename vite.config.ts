@@ -10,32 +10,7 @@ function siteUrl(url: string): Plugin {
   };
 }
 
-/** Loud (non-fatal) warning when a build ships without a contact-form key. */
-function contactKeyCheck(env: Record<string, string>, command: string): Plugin {
-  return {
-    name: "contact-key-check",
-    buildStart() {
-      if (command !== "build") return;
-      if (!(env.VITE_WEB3FORMS_KEY || "").trim() && !(env.VITE_FORMSPREE_ID || "").trim()) {
-        const bar = "=".repeat(72);
-        this.warn(
-          `
-${bar}
-  VITE_WEB3FORMS_KEY is EMPTY - the contact form cannot send in this build.
-` +
-            `  Visitors will get the "Email me instead" fallback only.
-` +
-            `  Add it in .env.local (local) or Vercel > Settings > Environment Variables,
-` +
-            `  then rebuild / redeploy (Vite bakes VITE_* in at build time).
-${bar}`
-        );
-      }
-    },
-  };
-}
-
-export default defineConfig(({ mode, command }) => {
+export default defineConfig(({ mode }) => {
   // loadEnv reads .env files and also picks up VITE_* vars from the shell /
   // hosting dashboard (e.g. Vercel's Environment Variables)
   const env = loadEnv(mode, ".", "VITE_");
@@ -43,7 +18,7 @@ export default defineConfig(({ mode, command }) => {
   const base = loadEnv(mode, ".", "BASE_PATH").BASE_PATH || "/";
   return {
     base,
-    plugins: [react(), siteUrl(resolveSiteUrl(env)), contactKeyCheck(env, command)],
+    plugins: [react(), siteUrl(resolveSiteUrl(env))],
     resolve: {
       // one copy of react / three / fiber, so drei always shares fiber's store
       dedupe: ["react", "react-dom", "three", "@react-three/fiber"],

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, TouchEvent } from "react";
 import { m } from "framer-motion";
 import DottedBackground from "../layout/DottedBackground";
@@ -19,6 +19,16 @@ const EASE = [0.22, 1, 0.36, 1] as const;
  * 03 / PROJECTS — an immersive selector where the stage atmosphere transforms
  * per project. Colours live in CSS variables scoped to this section only.
  */
+/** Relative luminance of a #rrggbb colour (0 = black, 1 = white). */
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const lin = (i: number) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+}
+
 export default function ProjectsSection() {
   const [activeId, setActiveId] = useState<ProjectId>(defaultProjectId);
   const [caseStudyOpen, setCaseStudyOpen] = useState(false);
@@ -60,10 +70,24 @@ export default function ProjectsSection() {
     go(dx < 0 ? 1 : -1);
   };
 
+  // light worlds (Inayat) get ink text; dark worlds keep ivory — every tint
+  // below is a CSS variable, so switching worlds never leaves stale colours
+  const light = luminance(project.theme.bg) > 0.5;
+  useEffect(() => {
+    window.dispatchEvent(new Event("section-tone"));
+  }, [light]);
   const themeStyle = {
     "--proj-bg": project.theme.bg,
     "--proj-fg": project.theme.fg,
     "--proj-accent": project.theme.accent,
+    "--proj-on-accent": luminance(project.theme.accent) > 0.35 ? "#151515" : "#F5F0E8",
+    "--proj-text": light ? "#151515" : "#F5F0E8",
+    "--proj-text-2": light ? "rgba(21,21,21,0.86)" : "rgba(245,240,232,0.86)",
+    "--proj-text-3": light ? "rgba(21,21,21,0.72)" : "rgba(245,240,232,0.65)",
+    "--proj-text-4": light ? "rgba(21,21,21,0.6)" : "rgba(245,240,232,0.5)",
+    "--proj-line": light ? "rgba(21,21,21,0.14)" : "rgba(245,240,232,0.14)",
+    "--proj-line-2": light ? "rgba(21,21,21,0.25)" : "rgba(245,240,232,0.25)",
+    "--proj-panel": light ? "rgba(255,255,255,0.55)" : "rgba(21,21,21,0.6)",
   } as CSSProperties;
 
   return (
@@ -71,8 +95,9 @@ export default function ProjectsSection() {
       id="projects"
       ref={ref}
       aria-labelledby="projects-heading"
-      className="on-ink relative overflow-hidden text-[#F5F0E8]"
+      className={`relative overflow-hidden text-[var(--proj-text)] ${light ? "" : "on-ink"}`}
       style={themeStyle}
+      data-tone={light ? "light" : "dark"}
     >
       {/* atmosphere — animates between any two projects */}
       <m.div
@@ -82,7 +107,7 @@ export default function ProjectsSection() {
         animate={{ backgroundColor: project.theme.bg }}
         transition={{ duration: 0.8, ease: EASE }}
       />
-      <DottedBackground tone="ink" />
+      <DottedBackground tone={light ? "ivory" : "ink"} />
 
       <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-24 pt-28 sm:px-8 lg:px-12 lg:pt-32">
         <SectionHeader
@@ -90,7 +115,7 @@ export default function ProjectsSection() {
           eyebrow={sectionHeadings.projects.eyebrow}
           title={sectionHeadings.projects.title}
           copy={sectionHeadings.projects.copy}
-          tone="ivory"
+          tone={light ? "ink" : "ivory"}
         />
 
         <div className="mt-10 lg:mt-14">
@@ -99,7 +124,7 @@ export default function ProjectsSection() {
 
         <div className="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[1.08fr_0.92fr] lg:gap-8">
           <div
-            className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-[rgba(245,240,232,0.14)] shadow-[0_30px_90px_rgba(0,0,0,0.35)]"
+            className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-[var(--proj-line)] shadow-[0_30px_90px_rgba(0,0,0,0.35)]"
             role="group"
             aria-label={`Project stage: ${project.name}. Use arrow keys or swipe to change project.`}
             tabIndex={0}
@@ -119,7 +144,7 @@ export default function ProjectsSection() {
               <BrandEnvironment project={project} />
             </ProjectTransition>
 
-            <p className="pointer-events-none absolute bottom-3 left-4 font-display text-[0.6rem] font-bold uppercase tracking-[0.26em] text-[rgba(245,240,232,0.45)]">
+            <p className="pointer-events-none absolute bottom-3 left-4 font-display text-[0.6rem] font-bold uppercase tracking-[0.26em] text-[var(--proj-text-4)]">
               {`WORLD ${project.number} / 04`}
             </p>
           </div>

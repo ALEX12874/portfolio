@@ -115,11 +115,11 @@ export const projects: Project[] = [
     logo: assets.logoInayat,
     logoPresentation: "plate",
     logoAlt: "Inayat logo — ivory botanical sprig with INAYAT and Where Elegance Meets Essence on charcoal",
-    theme: { bg: "#1A1917", fg: "#F5F0E8", accent: "#D8FF63", motif: "botanical" },
+    theme: { bg: "#EDE5D8", fg: "#151515", accent: "#6E6358", motif: "botanical" },
     cta: {
       kind: "external",
       label: "Explore Inayat",
-      href: "https://veds0710.wixsite.com/deniz/team-4",
+      href: "https://veds0710.wixsite.com/deniz",
     },
   },
 ];

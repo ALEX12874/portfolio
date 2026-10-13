@@ -10,7 +10,13 @@ export const site = {
   roleLine: "Marketing | Consumer Behaviour | Brand Strategy",
   location: "Rajasthan, India",
   email: "gouranglokwani27@gmail.com",
-  linkedin: "https://www.linkedin.com/in/gouranglokwani",
+  linkedin: "https://www.linkedin.com/in/gourang-lokwani-438394297/",
+  /**
+   * Contact form endpoint (FormSubmit, no API key). After activating the
+   * form, the address can be swapped for FormSubmit's random-string alias:
+   * https://formsubmit.co/ajax/<alias>
+   */
+  contactEndpoint: "https://formsubmit.co/ajax/gouranglokwani27@gmail.com",
   /** Empty by default — the GitHub button auto-hides when this is "". */
   github: "",
   copyright: "© 2026 Gourang Lokwani",

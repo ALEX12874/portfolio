@@ -170,11 +170,11 @@ export default function ContactForm({ email }: ContactFormProps) {
   };
 
   const failCopy: Record<FailReason, string> = {
-    config: "Couldn't send automatically — the form isn't connected yet.",
     offline: "You seem to be offline, so I couldn't send it.",
     timeout: "Couldn't send — the mail service took too long to answer.",
-    rejected: `Couldn't send — the mail service said: ${failDetail || "request rejected"}.`,
+    rejected: `Couldn't send automatically — the mail service said: ${failDetail || "request rejected"}.`,
     network: "Couldn't send automatically — the connection to the mail service failed.",
+    pending: "Couldn't send automatically — the form is waiting to be activated.",
   };
 
   const sendAnother = () => {
@@ -378,7 +378,7 @@ export default function ContactForm({ email }: ContactFormProps) {
                       onClick={copyMessage}
                       className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[rgba(21,21,21,0.25)] px-4 font-display text-[0.82rem] font-bold text-[#151515] hover:border-[#151515] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E63843] focus-visible:ring-offset-2"
                     >
-                      {copied ? "Copied" : "Copy my message"}
+                      {copied ? "Copied" : "Copy message"}
                     </button>
                   </div>
                   <p className="mt-2 text-xs text-[rgba(21,21,21,0.6)]">

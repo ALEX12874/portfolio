@@ -31,16 +31,16 @@ Copy `.env.example` to `.env.local` and fill in:
 | `VITE_WEB3FORMS_KEY` | Contact-form delivery to Gmail via Web3Forms. |
 | `VITE_SITE_URL` | Public URL used by canonical, Open Graph, JSON-LD and the sitemap. Defaults to `https://gouranglokwani.vercel.app`. |
 
-### Contact form key (Web3Forms)
+### Contact form
 
-Get a free key at [web3forms.com](https://web3forms.com) by entering
-**gouranglokwani27@gmail.com**; the key is emailed to you. Add it in
-`.env.local` and in the hosting dashboard's Environment Variables, then
-redeploy. The key is public by design (it can only send mail to that inbox),
-but it is still kept out of the repository.
+Primary sender: **FormSubmit** (no API key) — endpoint in `src/data/site.ts`
+(`contactEndpoint`). The first submission emails gouranglokwani27@gmail.com an
+"Activate Form" link; click it once and every enquiry is forwarded. After
+activation you can replace the address in `contactEndpoint` with the random
+alias FormSubmit shows, to hide it.
 
-Without a key the form shows its error state with a `mailto:` fallback, and a
-single warning is logged to the dev console.
+Optional backup: **Web3Forms**, used only if `VITE_WEB3FORMS_KEY` is set (in
+`.env.local` and in Vercel's Environment Variables, then redeploy).
 
-The sender lives in `src/lib/sendEnquiry.ts` behind one function, so it can be
-swapped for a serverless route later without touching the form UI.
+If both fail, the form offers "Email me instead" (pre-filled mailto) and
+"Copy message". Tests (network mocked): `npm run test:contact`.

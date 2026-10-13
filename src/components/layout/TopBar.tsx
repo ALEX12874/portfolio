@@ -8,8 +8,11 @@ type Tone = "ink" | "ivory";
 /** Sections rendered on an ink (dark) background. */
 const INK_SECTIONS = new Set(["capabilities", "projects", "experience", "contact"]);
 
-function toneForSection(id: string | null): Tone {
+function toneForSection(id: string | null, el?: HTMLElement | null): Tone {
   if (!id) return "ink";
+  // sections whose background changes (e.g. the light Inayat world) say so
+  if (el?.dataset.tone === "light") return "ink";
+  if (el?.dataset.tone === "dark") return "ivory";
   return INK_SECTIONS.has(id) ? "ivory" : "ink";
 }
 
@@ -23,16 +26,18 @@ function useSectionAtTop(): Tone {
       frame = 0;
       const probe = 44; // just under the bar
       let current: string | null = null;
+      let currentEl: HTMLElement | null = null;
       for (const s of sections) {
         const el = document.getElementById(s.id);
         if (!el) continue;
         const r = el.getBoundingClientRect();
         if (r.top <= probe && r.bottom > probe) {
           current = s.id;
+          currentEl = el;
           break;
         }
       }
-      setTone(toneForSection(current));
+      setTone(toneForSection(current, currentEl));
     };
     const onScroll = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -40,9 +45,12 @@ function useSectionAtTop(): Tone {
     measure();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+    // a section changed its own tone (project world switch)
+    window.addEventListener("section-tone", onScroll);
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      window.removeEventListener("section-tone", onScroll);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);

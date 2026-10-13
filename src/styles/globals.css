@@ -590,13 +590,53 @@ section[id] {
   max-width: 10.5rem;
 }
 
+/* QR: small, top-right corner — clear of the centred logo and the module row */
 .qr-motif {
   position: absolute;
   right: 4%;
-  bottom: 6%;
-  width: clamp(64px, 12%, 110px);
+  top: 6%;
+  width: clamp(44px, 9%, 84px);
   height: auto;
-  opacity: 0.5;
+  opacity: 0.4;
+}
+@media (max-width: 419px) {
+  .qr-motif {
+    display: none;
+  }
+}
+
+/* Synkk: logo → workflow row in one column (bottom padding clears "WORLD 03 / 04") */
+.synkk-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7% 6% 12%;
+}
+.logo-plate.synkk-logo {
+  width: clamp(96px, 34%, 220px);
+  flex: none;
+}
+@media (min-width: 640px) {
+  .logo-plate.synkk-logo {
+    width: min(40%, 240px);
+  }
+}
+.synkk-row {
+  gap: 8px;
+  margin-top: 30px; /* room for the ORDER chip above the row */
+}
+@media (min-width: 640px) {
+  .synkk-row {
+    gap: 1.5rem;
+  }
+}
+@media (max-width: 379px) {
+  .module-sub {
+    display: none;
+  }
 }
 
 .fragrance-dot {
