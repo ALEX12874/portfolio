@@ -1,29 +1,40 @@
 /**
- * Single source of truth for every shipped attachment path.
+ * Single source of truth for every shipped attachment.
  * Components must never hard-code an asset path — always import from here.
  * Empty string means "asset not provided" and the UI must hide that element.
- * Paths are prefixed with the build's base URL so the site also works when
- * hosted under a sub-path (e.g. GitHub Pages: /repo-name/).
+ *
+ * Files live in src/assets and are imported, so Vite fingerprints them and
+ * ships them with the build — they can never 404 or depend on public/ paths.
  */
-const base = import.meta.env.BASE_URL;
+import billboard from "../assets/billboard-its-all-marketing.png";
+import resume from "../assets/gourang-lokwani-resume.pdf?url";
+import logoDipNSip from "../assets/logo-dipnsip.png";
+import logoWrepd from "../assets/logo-wrepd.png";
+import logoSynkk from "../assets/logo-synkk.png";
+import logoInayat from "../assets/logo-inayat.png";
+import certHlbs from "../assets/cert-hlbs.png";
+import certGyayak from "../assets/cert-gyayak.pdf?url";
 
 export const assets = {
   /** Hero 3D billboard texture — bright red "IT'S ALL MARKETING." artwork (4:1). */
-  billboard: `${base}assets/billboard-its-all-marketing.png`,
+  billboard,
   /** Résumé PDF — hero "Get Resume" button. */
-  resume: `${base}assets/Gourang_Lokwani_Resume.pdf`,
+  resume,
   /** Project 01 logo — Dip N Sip (deep forest-green square). */
-  logoDipNSip: `${base}assets/logo-dipnsip.png`,
+  logoDipNSip,
   /** Project 02 logo — Wrepd (white background artwork). */
-  logoWrepd: `${base}assets/logo-wrepd.png`,
+  logoWrepd,
   /** Project 03 logo — Synkk (pure black square). */
-  logoSynkk: `${base}assets/logo-synkk.png`,
+  logoSynkk,
   /** Project 04 logo — Inayat (charcoal background artwork). */
-  logoInayat: `${base}assets/logo-inayat.png`,
+  logoInayat,
   /** Experience 01 certificate — HLBS Tech internship certificate (portrait PNG). */
-  certHlbs: `${base}assets/cert-hlbs.png`,
+  certHlbs,
   /** Experience 02 certificate — Gyayak Marketing completion letter (PDF). */
-  certGyayak: `${base}assets/cert-gyayak.pdf`,
+  certGyayak,
 } as const;
+
+/** Friendly filename for the résumé download (the shipped file is hashed). */
+export const RESUME_FILENAME = "Gourang_Lokwani_Resume.pdf";
 
 export type Assets = typeof assets;

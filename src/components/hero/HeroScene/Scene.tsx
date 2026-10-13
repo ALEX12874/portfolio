@@ -1,5 +1,5 @@
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import Road from "./Road";
 import Footpath from "./Footpath";
@@ -14,6 +14,31 @@ interface SceneProps {
   active: boolean;
   /** Pointer parallax (disabled on touch / reduced motion). */
   parallax: boolean;
+  /** Called once if the device can't hold ~30 fps; the hero swaps to 2.5D. */
+  onLowFps?: () => void;
+}
+
+const WARMUP_S = 0.6; // ignore shader-compile frames
+const SAMPLE_S = 2; // then average frame time over ~2 s
+const SLOW_MS = 34; // ≈ 29 fps
+
+/** Adaptive quality guard: measures the average frame time after mount. */
+function FrameGuard({ onLowFps }: { onLowFps?: () => void }) {
+  const t = useRef({ elapsed: 0, sampled: 0, frames: 0, done: false });
+  useFrame((_, delta) => {
+    const s = t.current;
+    if (s.done || !onLowFps) return;
+    s.elapsed += delta;
+    if (s.elapsed < WARMUP_S) return;
+    s.sampled += delta;
+    s.frames += 1;
+    if (s.sampled >= SAMPLE_S) {
+      s.done = true;
+      const avgMs = (s.sampled / s.frames) * 1000;
+      if (avgMs > SLOW_MS) onLowFps();
+    }
+  });
+  return null;
 }
 
 /**
@@ -42,7 +67,7 @@ const CARS = [
  * - Fog: 52 → 115, so the near ink skyline keeps its colour and only the far
  *   row dissolves into the page.
  */
-export default function Scene({ active, parallax }: SceneProps) {
+export default function Scene({ active, parallax, onLowFps }: SceneProps) {
   return (
     <Canvas
       shadows
@@ -59,6 +84,8 @@ export default function Scene({ active, parallax }: SceneProps) {
         camera.lookAt(-7.3, 7.5, -2.61);
       }}
     >
+      <FrameGuard onLowFps={onLowFps} />
+
       {/* haze: crisp foreground, far row dissolving into the ivory page */}
       <fog attach="fog" args={["#F5F0E8", 52, 115]} />
 

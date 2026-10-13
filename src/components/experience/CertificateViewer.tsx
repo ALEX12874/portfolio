@@ -3,7 +3,9 @@ import { Maximize2, Minus, Plus, X } from "lucide-react";
 // `?url` makes Vite emit the worker as a real asset in dev AND in the build —
 // a bare-specifier `new URL(..., import.meta.url)` is not rewritten by Vite
 // and leaves pdf.js polling a 404 worker forever.
-import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// The legacy build carries the polyfills older Safari / iPadOS needs (the
+// modern build requires Safari 17.4+ and fails silently before that).
+import pdfWorkerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import type { Certificate } from "../../data/experience";
 
 /* ------------------------------------------------------------------ lightbox */
@@ -91,6 +93,17 @@ function Lightbox({ open, src, alt, onClose }: LightboxProps) {
 type PdfMode = "loading" | "canvas" | "embed" | "link";
 
 /**
+ * Where an inline <object> PDF embed can be trusted. iPad / iPhone Safari
+ * often paints it as an empty box, so those go straight to the link card.
+ */
+function embedFallback(): PdfMode {
+  const ua = navigator.userAgent;
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const viewer = (navigator as Navigator & { pdfViewerEnabled?: boolean }).pdfViewerEnabled;
+  return !iOS && viewer !== false ? "embed" : "link";
+}
+
+/**
  * Renders page 1 of a PDF to a <canvas> with pdfjs. If anything fails it
  * falls back to an <object> embed and finally to a plain "Open PDF" link —
  * the section never shows a blank box.
@@ -113,10 +126,17 @@ function PdfPreview({
 
     const render = async () => {
       try {
-        const pdfjs = await import("pdfjs-dist");
+        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
         pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
-        const doc = await pdfjs.getDocument({ url: src }).promise;
+        // fetch once ourselves: one plain request, no aborted range/stream
+        // requests from pdf.js
+        const res = await fetch(src);
+        if (!res.ok) throw new Error(`pdf fetch ${res.status}`);
+        const data = new Uint8Array(await res.arrayBuffer());
+        if (cancelled) return;
+
+        const doc = await pdfjs.getDocument({ data }).promise;
         // React StrictMode (dev) mounts the effect twice; the first pass must
         // stop here or pdf.js throws "same canvas during multiple renders".
         if (cancelled) {
@@ -145,7 +165,7 @@ function PdfPreview({
         onRendered?.(dataUrl);
         await doc.destroy();
       } catch {
-        if (!cancelled) setMode("embed");
+        if (!cancelled) setMode(embedFallback());
       }
     };
 
@@ -153,7 +173,7 @@ function PdfPreview({
     // Watchdog: if nothing resolved (e.g. a browser that refuses the module
     // worker), degrade to the embed fallback instead of loading forever.
     const watchdog = window.setTimeout(() => {
-      if (!cancelled) setMode((m) => (m === "loading" ? "embed" : m));
+      if (!cancelled) setMode((m) => (m === "loading" ? embedFallback() : m));
     }, 15000);
 
     return () => {
@@ -175,9 +195,14 @@ function PdfPreview({
         href={src}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex min-h-[160px] items-center justify-center rounded-md border border-dashed border-[rgba(245,240,232,0.4)] bg-[rgba(245,240,232,0.08)] p-6 text-center font-display text-[0.78rem] font-bold uppercase tracking-[0.18em] text-[#F5F0E8]"
+        className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-[rgba(21,21,21,0.25)] bg-[#F5F0E8] p-6 text-center text-[#151515] transition-colors hover:border-[#E63843]"
       >
-        Open PDF — preview unavailable
+        <span className="font-display text-[0.7rem] font-bold uppercase tracking-[0.2em] text-[rgba(21,21,21,0.6)]">
+          {alt}
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-[#151515] px-5 py-2.5 font-display text-[0.78rem] font-bold uppercase tracking-[0.16em] text-[#F5F0E8]">
+          Open PDF ↗
+        </span>
       </a>
     );
   }
@@ -270,7 +295,7 @@ export default function CertificateViewer({ certificate }: CertificateViewerProp
             alt={certificate.alt}
             width={1200}
             height={1600}
-            loading="lazy"
+            decoding="async"
             className="mx-auto block h-auto w-full rounded-sm"
           />
         ) : (

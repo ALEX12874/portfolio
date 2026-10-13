@@ -116,7 +116,6 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
                 alt={alt}
                 width={width}
                 height={height}
-                loading="lazy"
                 decoding="async"
                 draggable={false}
               />

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { site } from "../../data/site";
-import { assets } from "../../data/assets";
+import { assets, RESUME_FILENAME } from "../../data/assets";
 import { scrollToSection } from "../../lib/scroll";
 import MagneticButton from "./MagneticButton";
 import SocialButton, { GitHubMark, LinkedInMark } from "./SocialButton";
@@ -43,7 +43,7 @@ export default function HeroText() {
       variants={container}
       initial="hidden"
       animate="show"
-      className="relative z-10 max-w-[46rem]"
+      className="hero-copy relative z-10 max-w-[46rem]"
     >
       <motion.p variants={rise} className="eyebrow text-[#E63843]">
         {site.eyebrow}
@@ -52,7 +52,7 @@ export default function HeroText() {
       <motion.h1
         variants={rise}
         id="home-heading"
-        className="display mt-7 text-[length:var(--size-hero)] leading-[0.86]"
+        className="display mt-7 text-[length:var(--size-hero)] leading-[0.9]"
       >
         <span className="block text-[#151515]">{site.firstName}</span>
         <span className="block text-[#E63843]">{site.lastName}</span>
@@ -87,7 +87,7 @@ export default function HeroText() {
 
           <a
             href={assets.resume}
-            download
+            download={RESUME_FILENAME}
             aria-label="Download résumé"
             className="icon-circle !h-[52px] !w-[52px]"
             title="Download résumé"

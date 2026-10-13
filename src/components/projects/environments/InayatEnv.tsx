@@ -101,7 +101,7 @@ export default function InayatEnv() {
             alt="Inayat logo"
             width={234}
             height={144}
-            loading="lazy"
+            decoding="async"
             className="h-full w-full object-contain"
           />
         </figure>

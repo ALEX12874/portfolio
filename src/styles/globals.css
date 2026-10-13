@@ -203,59 +203,23 @@ section[id] {
   animation: marker-wipe 620ms var(--ease-editorial) 900ms forwards;
 }
 
-/* 2.5D fallback — CSS-animated cars and walkers */
-.fb-car {
-  position: absolute;
-  left: 0;
-  width: 74px;
-  height: 20px;
-  border-radius: 7px 12px 4px 4px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
-  animation-name: fb-drive;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
+/* 2.5D fallback — pedestrians idle-bob (cars move via SVG animateMotion) */
+.fb-bob {
+  animation: fb-bob 2.4s ease-in-out infinite;
 }
 
-.fb-car::after {
-  content: "";
-  position: absolute;
-  right: 8px;
-  top: -7px;
-  width: 34px;
-  height: 10px;
-  border-radius: 6px 8px 0 0;
-  background: inherit;
-  filter: brightness(0.9);
-}
-
-@keyframes fb-drive {
-  from {
-    transform: translateX(120vw);
+@keyframes fb-bob {
+  0%,
+  100% {
+    transform: translateY(0);
   }
-  to {
-    transform: translateX(-30vw);
-  }
-}
-
-.fb-walker {
-  position: absolute;
-  animation-name: fb-walk;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-@keyframes fb-walk {
-  from {
-    transform: translateX(115%);
-  }
-  to {
-    transform: translateX(-860%);
+  50% {
+    transform: translateY(-1.2px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fb-car,
-  .fb-walker {
+  .fb-bob {
     animation: none;
   }
 }
@@ -331,13 +295,39 @@ section[id] {
   aspect-ratio: 3 / 2;
 }
 
+/* old Safari without aspect-ratio: give plates a definite height */
+@supports not (aspect-ratio: 1 / 1) {
+  .logo-plate {
+    height: min(52vw, 260px);
+  }
+  .logo-plate--wide {
+    height: min(34vw, 174px);
+  }
+}
+
 /* ---- LogoSlab3D: logo as the face of a thick bevelled slab ---- */
 .logo-slab {
   position: relative;
-  /* ~68% of the stage height, never wider than 80% of the stage */
-  width: var(--slab, min(68cqh, 80cqw));
+  /* fallback for browsers without container-query units (older Safari) */
+  width: var(--slab, min(62%, 360px));
   aspect-ratio: 1 / 1;
   perspective: 1100px;
+}
+
+/* ~68% of the stage height, never wider than 80% of the stage */
+@supports (width: 1cqh) {
+  .logo-slab {
+    width: var(--slab, min(68cqh, 80cqw));
+  }
+}
+
+/* very old Safari without aspect-ratio: keep the slab square via padding */
+@supports not (aspect-ratio: 1 / 1) {
+  .logo-slab::before {
+    content: "";
+    display: block;
+    padding-top: 100%;
+  }
 }
 
 .logo-slab__floor {
@@ -509,25 +499,6 @@ section[id] {
   }
 }
 
-.speed-line {
-  position: absolute;
-  left: 0;
-  width: 34%;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
-  animation: speed-sweep 4.6s linear infinite;
-}
-
-@keyframes speed-sweep {
-  from {
-    transform: translateX(-40vw);
-  }
-  to {
-    transform: translateX(120vw);
-  }
-}
-
 .gps-pin {
   position: absolute;
   width: 12px;
@@ -580,19 +551,6 @@ section[id] {
 @keyframes dash-flow {
   to {
     stroke-dashoffset: -160;
-  }
-}
-
-.truck-run {
-  animation: truck-run 13s linear infinite;
-}
-
-@keyframes truck-run {
-  from {
-    transform: translateX(-46%);
-  }
-  to {
-    transform: translateX(260%);
   }
 }
 
@@ -681,5 +639,14 @@ section[id] {
   }
   body::-webkit-scrollbar-thumb:hover {
     background: var(--ink-40);
+  }
+}
+
+/* ---- hero: the copy column always ends before the 52vw scene stage ---- */
+@media (min-width: 1024px) {
+  .hero-copy {
+    /* stage starts at 48vw; subtract the container's left inset (3rem, or
+       more once the 1600px container centres) and a 1.5rem gap */
+    max-width: min(760px, calc(48vw - max(3rem, (100vw - 1600px) / 2 + 3rem) - 1.5rem));
   }
 }

@@ -81,7 +81,7 @@ export default function SynkkEnv() {
             alt="Synkk logo"
             width={1080}
             height={1080}
-            loading="lazy"
+            decoding="async"
             className="h-full w-full object-contain"
           />
         </figure>
