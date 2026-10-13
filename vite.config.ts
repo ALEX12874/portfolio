@@ -14,7 +14,10 @@ export default defineConfig(({ mode }) => {
   // loadEnv reads .env files and also picks up VITE_* vars from the shell /
   // hosting dashboard (e.g. Vercel's Environment Variables)
   const env = loadEnv(mode, ".", "VITE_");
+  // BASE_PATH is set by the GitHub Pages workflow ("/" or "/repo-name/")
+  const base = loadEnv(mode, ".", "BASE_PATH").BASE_PATH || "/";
   return {
+    base,
     plugins: [react(), siteUrl(resolveSiteUrl(env))],
     resolve: {
       // one copy of react / three / fiber, so drei always shares fiber's store
