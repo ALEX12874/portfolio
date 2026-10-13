@@ -3,9 +3,8 @@ import DottedBackground from "../layout/DottedBackground";
 import SectionHeader from "../layout/SectionHeader";
 import SkillNavigation from "./SkillNavigation";
 import SkillPanel from "./SkillPanel";
-import RetryBoundary from "../layout/RetryBoundary";
 import { sectionHeadings } from "../../data/site";
-import { useActiveInView, useNearViewport } from "../../hooks/useInView";
+import { useActiveInView } from "../../hooks/useInView";
 
 // 3D is lazy-loaded so three.js stays out of the first paint
 const SolarSystem = lazy(() => import("./SolarSystem"));
@@ -19,8 +18,6 @@ export default function Capabilities() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { ref, active } = useActiveInView<HTMLElement>(0.04);
-  // three.js is only fetched once the section is ~600px from the viewport
-  const { ref: nearRef, near } = useNearViewport<HTMLDivElement>("600px");
   const copy = sectionHeadings.capabilities;
 
   // Esc clears the selection
@@ -52,21 +49,16 @@ export default function Capabilities() {
           tone="ivory"
         />
 
-        {/* phones/tablets: canvas → chip rail → inline card (stacked, nothing
-            overlays the planets); lg: index rail left, orbit right */}
-        <div className="mt-8 flex flex-col gap-4 lg:mt-14 lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-stretch lg:gap-8">
-          <div className="order-2 min-w-0 lg:order-none">
-            <SkillNavigation
-              selectedId={selectedId}
-              hoveredId={hoveredId}
-              onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-              onHover={setHoveredId}
-            />
-          </div>
+        <div className="mt-10 grid gap-8 lg:mt-14 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-stretch lg:gap-8">
+          <SkillNavigation
+            selectedId={selectedId}
+            hoveredId={hoveredId}
+            onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+            onHover={setHoveredId}
+          />
 
           {/* the orbit fills everything right of the index, bleeding to the section edge */}
-          <div ref={nearRef} className="relative order-1 -mx-5 h-[56svh] min-h-[320px] sm:-mx-8 lg:order-none lg:-mr-12 lg:ml-0 lg:h-[82vh] lg:min-h-[620px] lg:w-[calc(100%+3rem)]">
-            <RetryBoundary label="the orbit">
+          <div className="relative h-[48vh] min-h-[340px] w-full lg:-mr-12 lg:h-[82vh] lg:min-h-[620px] lg:w-[calc(100%+3rem)]">
             <Suspense
               fallback={
                 <div className="flex h-full w-full items-center justify-center">
@@ -76,29 +68,20 @@ export default function Capabilities() {
                 </div>
               }
             >
-              {near ? (
-                <SolarSystem
-                  selectedId={selectedId}
-                  hoveredId={hoveredId}
-                  onSelect={setSelectedId}
-                  onHover={setHoveredId}
-                  active={active}
-                />
-              ) : null}
+              <SolarSystem
+                selectedId={selectedId}
+                hoveredId={hoveredId}
+                onSelect={setSelectedId}
+                onHover={setHoveredId}
+                active={active}
+              />
             </Suspense>
-            </RetryBoundary>
 
-            <div className="hidden lg:block">
-              <SkillPanel selectedId={selectedId} onSelect={setSelectedId} variant="floating" />
-            </div>
+            <SkillPanel selectedId={selectedId} onSelect={setSelectedId} />
 
-            <p className="pointer-events-none absolute bottom-1 left-5 sm:left-8 lg:left-1 font-display text-[0.62rem] font-bold uppercase tracking-[0.24em] text-[rgba(245,240,232,0.35)] lg:bottom-3 lg:left-3">
+            <p className="pointer-events-none absolute bottom-1 left-1 font-display text-[0.62rem] font-bold uppercase tracking-[0.24em] text-[rgba(245,240,232,0.35)] lg:bottom-3 lg:left-3">
               09 skills · one strategic centre
             </p>
-          </div>
-
-          <div className="order-3 lg:hidden">
-            <SkillPanel selectedId={selectedId} onSelect={setSelectedId} variant="inline" />
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo } from "react";
+import { Canvas } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import Sun from "./Sun";
@@ -9,7 +9,6 @@ import CameraControls from "./CameraControls";
 import SolarFallback from "./SolarFallback";
 import SceneErrorBoundary from "../layout/SceneErrorBoundary";
 import { PLANET_LAYOUT } from "./planets";
-import { COARSE, focus } from "./planets/focus";
 import { skills } from "../../data/skills";
 import { useWebGLSupport } from "../../hooks/useWebGLSupport";
 import { usePrefersReducedMotion } from "../../hooks/useReducedMotion";
@@ -23,27 +22,6 @@ interface SolarSystemProps {
 }
 
 const DUST = 650;
-
-/** Remembered for the page's life: a device that can't hold ~30 fps keeps the 2D orbit. */
-let solarTooSlow = false;
-
-/** Average frame time after a short warm-up; reports once if too slow. */
-function FrameGuard({ onSlow }: { onSlow: () => void }) {
-  const t = useRef({ elapsed: 0, sampled: 0, frames: 0, done: false });
-  useFrame((_, delta) => {
-    const s = t.current;
-    if (s.done) return;
-    s.elapsed += delta;
-    if (s.elapsed < 0.8) return;
-    s.sampled += delta;
-    s.frames += 1;
-    if (s.sampled >= 2) {
-      s.done = true;
-      if ((s.sampled / s.frames) * 1000 > 34) onSlow();
-    }
-  });
-  return null;
-}
 
 /** Faint ivory star dust around (never inside) the system. */
 function StarDust() {
@@ -118,53 +96,27 @@ export default function SolarSystem({
 }: SolarSystemProps) {
   const webgl = useWebGLSupport();
   const reduced = usePrefersReducedMotion();
-  const [slow, setSlow] = useState(solarTooSlow);
-
-  // nothing selected (or the Sun): the camera returns to the origin
-  if (!selectedId || selectedId === "brand-strategy") focus.active = false;
 
   const fallback = (
     <SolarFallback selectedId={selectedId} hoveredId={hoveredId} onSelect={onSelect} onHover={onHover} />
   );
 
-  if (!webgl || slow) return fallback;
+  if (!webgl) return fallback;
 
   return (
     <div
       className="relative h-full w-full"
       style={{ touchAction: "pan-y" }}
-      role="group"
       aria-label="Interactive orbit diagram of marketing skills"
     >
       <SceneErrorBoundary fallback={fallback}>
         <Canvas
-          // phones / touch: low tier — native-ish pixel ratio, no extra AA cost
-          dpr={COARSE ? 1 : [1, 1.5]}
+          dpr={[1, 1.6]}
           frameloop={active ? "always" : "never"}
           camera={{ position: [0, 9, 26], fov: 34, near: 0.1, far: 200 }}
           gl={{ antialias: true, alpha: true }}
           onPointerMissed={() => onSelect(null)}
-          onCreated={({ gl }) => {
-            // iOS caps live WebGL contexts: on loss, switch to the 2D orbit
-            gl.domElement.addEventListener(
-              "webglcontextlost",
-              (e) => {
-                e.preventDefault();
-                solarTooSlow = true;
-                setSlow(true);
-              },
-              { once: true }
-            );
-          }}
         >
-          {active ? (
-            <FrameGuard
-              onSlow={() => {
-                solarTooSlow = true;
-                setSlow(true);
-              }}
-            />
-          ) : null}
           <ambientLight intensity={0.07} color="#F5F0E8" />
           {/* the Sun's light — red-tinted, slow falloff */}
           <pointLight position={[0, 0, 0]} intensity={60} distance={0} decay={1.2} color="#FFB0A4" />
