@@ -225,9 +225,17 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
           onPointerUp={(e) => {
             if (e.pointerType === "touch") tap();
           }}
-          onFocus={() => {
+          onFocus={(e) => {
             setArt(true);
-            setOn(true);
+            // keyboard focus only: a tap also focuses the button, and the
+            // tap's own 1.6 s timer must stay in charge of settling
+            let keyboard = true;
+            try {
+              keyboard = e.currentTarget.matches(":focus-visible");
+            } catch {
+              keyboard = true;
+            }
+            if (keyboard) setOn(true);
           }}
           onBlur={() => setOn(false)}
           onClick={(e) => {
