@@ -149,3 +149,27 @@ new build adds ~3 kB of JS (error boundaries, scene arbiter, motion policy, pop 
 - **Errors:** every section has a boundary with a styled fallback and Retry (reloads if a code
   chunk failed). Vercel Speed Insights added; Web Analytics is ready behind `VITE_ENABLE_ANALYTICS=1`.
 - **`npm run check`** = typecheck + build + Playwright smoke test (desktop, iPhone 13, 360×740).
+
+---
+
+# Follow-up — LCP fix and zoomed-out phone layout (commit `d23cd1a`)
+
+| Lighthouse mobile, live | Perf | FCP | LCP | TBT | CLS |
+| --- | --- | --- | --- | --- | --- |
+| Before this work | 95–98 | 1.4–1.8 s | 2.3–2.4 s | 10–40 ms | 0 |
+| After the first deploy | 95–96 | 1.6–1.7 s | 2.6–2.8 s | 0–50 ms | 0 |
+| **Now** | **98 / 98 / 98** | 1.7 s | **2.0–2.1 s** | **10–20 ms** | 0 |
+
+- **LCP:** on phones the browser first recorded the poster `<img>` (~1.9 s, throttled), then replaced it
+  with the `<video>`'s first frame (~3.1 s), because that box was fractionally larger. Now one
+  `<video>` shows the poster and later plays the loop (starting on the poster frame), so playback
+  never registers as a new, later LCP.
+- **TBT:** with the shorter phone hero, the solar system's 3D code started loading during page load.
+  Phones now start it 150 px before the orbit (desktop keeps 600 px).
+- **Zoomed-out phones (< 640 px):** rem is 15 px, so type, spacing, buttons and cards shrink ~6%
+  together (form fields stay 16 px for iOS). Width-based headlines are trimmed to match.
+  Testimonials are a snap carousel with dots. The solar canvas is shorter, with the orbit at
+  80% width. Phone page height went from 11.5 to 8.6 screens at 390×844, with no horizontal
+  overflow at 360–844 px.
+- **Live acceptance:** 0 console errors / warnings / failed requests / bad responses at 1440×900,
+  1280×720, iPhone 13 and 360×740, in normal and reduced motion. Everything animates.
