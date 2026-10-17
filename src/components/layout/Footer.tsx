@@ -44,7 +44,7 @@ export default function Footer() {
           <div>
             <p className="eyebrow text-[#E63843]">GET IN TOUCH</p>
 
-            <h2 id="contact-heading" className="display mt-6 text-[clamp(2.65rem,13.2vw,5.3rem)] leading-[0.9] sm:text-[clamp(3rem,15vw,6rem)] lg:text-[min(6.4vw,6.6rem)]">
+            <h2 id="contact-heading" className="display mt-6 text-[clamp(2.5rem,12.4vw,5.3rem)] leading-[0.9] sm:text-[clamp(3rem,15vw,6rem)] lg:text-[min(6.4vw,6.6rem)]">
               <span className="block">{site.firstName}</span>
               <span className="block text-[#E63843]">{site.lastName}</span>
             </h2>

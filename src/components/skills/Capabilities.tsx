@@ -68,7 +68,7 @@ export default function Capabilities() {
           </div>
 
           {/* the orbit fills everything right of the index, bleeding to the section edge */}
-          <div ref={nearRef} className="relative order-1 -mx-5 h-[56svh] min-h-[320px] sm:-mx-8 lg:order-none lg:-mr-12 lg:ml-0 lg:h-[82vh] lg:min-h-[620px] lg:w-[calc(100%+3rem)]">
+          <div ref={nearRef} className="relative order-1 -mx-5 h-[86vw] min-h-[290px] sm:-mx-8 sm:h-[56svh] sm:min-h-[320px] lg:order-none lg:-mr-12 lg:ml-0 lg:h-[82vh] lg:min-h-[620px] lg:w-[calc(100%+3rem)]">
             <RetryBoundary label="the orbit">
             <Suspense
               fallback={

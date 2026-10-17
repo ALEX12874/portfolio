@@ -116,7 +116,9 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
     // - height: the tilted ellipse (minor half-axis R·sin e) + planet headroom
     const R = OUTER_ORBIT + PLANET_MARGIN;
     const portrait = aspect < 1;
-    const halfW = R / (portrait ? FILL_PORTRAIT_W : 0.9);
+    // phones (narrow canvas): always the zoomed-out width, whatever the aspect
+    const narrow = gl.domElement.clientWidth < 640;
+    const halfW = R / (portrait || narrow ? FILL_PORTRAIT_W : 0.9);
     const halfH = (OUTER_ORBIT * Math.sin(ELEVATION) + PLANET_MARGIN) / (portrait ? 0.9 : FILL_LANDSCAPE_H);
     const distance = Math.max(halfW / (tanV * aspect), halfH / tanV);
 
