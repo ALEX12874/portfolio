@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import wideMp4 from "../../assets/hero/hero-wide.mp4";
 import wideWebm from "../../assets/hero/hero-wide.webm";
 import widePoster from "../../assets/hero/hero-wide.webp";
@@ -76,8 +76,8 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
     };
   }, [art]);
 
-  // track the stage size (the video box)
-  useLayoutEffect(() => {
+  // track the stage size (the video box) — after paint, never before it
+  useEffect(() => {
     const node = stageRef.current;
     if (!node) return undefined;
     const read = () => {
@@ -148,7 +148,7 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
     apply();
     return () => cancelAnimationFrame(a.raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, tapped, box?.width, box?.height, variant, fit]);
+  }, [on, tapped, art, box?.width, box?.height, variant, fit]);
 
   useEffect(() => () => window.clearTimeout(tapTimer.current), []);
 
@@ -175,21 +175,25 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
 
   return (
     <div ref={stageRef} className="pointer-events-none absolute inset-0">
-      {/* the flat billboard, homography-mapped onto the board in the video */}
-      <div
-        ref={layerRef}
-        aria-hidden="true"
-        className="hero-pop"
-        style={{ width: BOARD_W, height: BOARD_H, opacity: 0 }}
-      >
-        <div className="hero-pop__bezel">
-          <span className="hero-pop__led hero-pop__led--top" />
-          <span className="hero-pop__led hero-pop__led--bottom" />
-          <span className="hero-pop__led hero-pop__led--left" />
-          <span className="hero-pop__led hero-pop__led--right" />
-          <div className="hero-pop__art" style={art ? { backgroundImage: `url(${assets.billboard})` } : undefined} />
+      {/* the flat billboard, homography-mapped onto the board in the video;
+          mounted only after load / first interaction, so the first paint
+          (the poster, our LCP) carries none of its layers */}
+      {art ? (
+        <div
+          ref={layerRef}
+          aria-hidden="true"
+          className="hero-pop"
+          style={{ width: BOARD_W, height: BOARD_H, opacity: 0 }}
+        >
+          <div className="hero-pop__bezel">
+            <span className="hero-pop__led hero-pop__led--top" />
+            <span className="hero-pop__led hero-pop__led--bottom" />
+            <span className="hero-pop__led hero-pop__led--left" />
+            <span className="hero-pop__led hero-pop__led--right" />
+            <div className="hero-pop__art" style={{ backgroundImage: `url(${assets.billboard})` }} />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* small label above the board (never over the artwork) */}
       {quad ? (
