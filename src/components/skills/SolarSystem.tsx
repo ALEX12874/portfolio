@@ -112,6 +112,7 @@ export default function SolarSystem({
     <div
       className="relative h-full w-full"
       style={{ touchAction: "pan-y" }}
+      role="group"
       aria-label="Interactive orbit diagram of marketing skills"
     >
       <SceneErrorBoundary fallback={fallback}>

@@ -6,6 +6,7 @@ import Capabilities from "./components/skills/Capabilities";
 import DeferredSection from "./components/layout/DeferredSection";
 import RetryBoundary from "./components/layout/RetryBoundary";
 import { prefetchOnIdle } from "./lib/prefetch";
+import { startSmoothScroll } from "./lib/smoothScroll";
 
 // below the fold: separate chunks, rendered right after first paint
 const ProjectsSection = lazy(() => import("./components/projects/ProjectsSection"));
@@ -21,6 +22,15 @@ const Footer = lazy(() => import("./components/layout/Footer"));
 export default function App() {
   // after first paint, on idle: project logos + (desktop/tablet) the 3D chunk
   useEffect(() => prefetchOnIdle(), []);
+
+  // desktop wheel/trackpad: inertial smooth scrolling, started once the page
+  // has loaded so it never touches first paint
+  useEffect(() => {
+    const go = () => startSmoothScroll();
+    if (document.readyState === "complete") go();
+    else window.addEventListener("load", go, { once: true });
+    return () => window.removeEventListener("load", go);
+  }, []);
 
   return (
     // m.* components + the compact DOM feature set (no layout/drag features

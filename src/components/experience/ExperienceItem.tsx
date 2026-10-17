@@ -30,7 +30,7 @@ export default function ExperienceItem({ experience, onOpen }: ExperienceItemPro
       />
 
       <div className="grid grid-cols-1 items-baseline gap-x-6 gap-y-3 sm:grid-cols-[3rem_minmax(0,1.4fr)_minmax(0,1fr)] lg:grid-cols-[3.5rem_minmax(0,1.5fr)_minmax(0,1.2fr)_auto]">
-        <span className="font-display text-[0.72rem] font-bold tracking-[0.2em] text-[#E63843]">
+        <span className="red-small-ink font-display text-[0.72rem] font-bold tracking-[0.2em] text-[#E63843]">
           {experience.number}
         </span>
 

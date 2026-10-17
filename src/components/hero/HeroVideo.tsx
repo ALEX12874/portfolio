@@ -367,6 +367,8 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
 
   return (
     <div ref={wrap} className="relative h-full w-full" style={{ background: "#F5F0E8" }}>
+      {/* the poster is real content: described here, beside the hotspot */}
+      <div role="img" aria-label={ALT} className="absolute inset-0">
       <video
         key={variant}
         ref={video}
@@ -381,9 +383,7 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
         preload="none"
         poster={src.poster}
         disablePictureInPicture
-        // the poster is real content: describe it (the hotspot sits beside it)
-        role="img"
-        aria-label={ALT}
+        aria-hidden="true"
         tabIndex={-1}
       >
         {still || !attach ? null : (
@@ -393,6 +393,7 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
           </>
         )}
       </video>
+      </div>
       <BillboardPop key={variant} variant={variant} fit={fit} />
     </div>
   );

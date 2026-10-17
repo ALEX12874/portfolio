@@ -1321,3 +1321,35 @@ section[id] {
   content-visibility: auto;
   contain-intrinsic-size: auto 1200px;
 }
+
+/* ---- readable small red text (accessibility) ---------------------------
+   Eyebrows and small numbers are too small for the brand red's contrast:
+   deep red on light sections, a hair-lighter red on dark ones. */
+.eyebrow.text-\[\#E63843\],
+.red-small {
+  color: var(--red-text-light);
+}
+.on-ink .eyebrow.text-\[\#E63843\],
+.on-ink .red-small,
+.red-small-ink {
+  color: var(--red-text-ink);
+}
+
+/* ---- smooth scrolling (Lenis, desktop wheel/trackpad only) ---- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+html.lenis {
+  /* Lenis animates the scroll itself; native smooth scroll would fight it */
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}

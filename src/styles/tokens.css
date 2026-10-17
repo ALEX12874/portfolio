@@ -25,6 +25,11 @@
   --ivory: #f5f0e8;
   --lime: #d8ff63;
 
+  /* Small red text only (WCAG AA 4.5:1): the brand red is kept for headlines
+     and large text; small labels use these tints of the same red. */
+  --red-text-light: #c42530; /* on ivory: 5.7:1 */
+  --red-text-ink: #ea4651; /* on ink: 4.8:1 */
+
   /* Derived tints (ivory/ink at 8–70% opacity) */
   --ink-70: rgba(21, 21, 21, 0.7);
   --ink-55: rgba(21, 21, 21, 0.55);

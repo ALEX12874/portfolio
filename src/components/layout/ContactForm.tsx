@@ -194,7 +194,7 @@ export default function ContactForm({ email }: ContactFormProps) {
   const label = (f: FieldName, text: string) => (
     <label htmlFor={id(f)} className="mb-1 block text-sm font-semibold text-[#151515]">
       {text}{" "}
-      <span className="text-[#E63843]" aria-hidden="true">
+      <span className="text-[#C42530]" aria-hidden="true">
         *
       </span>
       <span className="sr-only">(required)</span>
@@ -350,7 +350,7 @@ export default function ContactForm({ email }: ContactFormProps) {
                 <p
                   id={`${uid}-count`}
                   className={`shrink-0 text-xs tabular-nums ${
-                    values.message.length > LIMITS.message - 100 ? "text-[#C42530]" : "text-[rgba(21,21,21,0.5)]"
+                    values.message.length > LIMITS.message - 100 ? "text-[#C42530]" : "text-[rgba(21,21,21,0.66)]"
                   }`}
                 >
                   {values.message.length} / {LIMITS.message}

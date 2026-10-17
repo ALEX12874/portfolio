@@ -109,7 +109,7 @@ export default function ExperienceDetailPanel({
         {/* sticky company + role */}
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[rgba(245,240,232,0.14)] bg-[#151515] px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:gap-6 sm:px-8 sm:py-5">
           <div className="min-w-0">
-            <p className="font-display text-[0.7rem] font-bold uppercase tracking-[0.24em] text-[#E63843]">
+            <p className="red-small-ink font-display text-[0.7rem] font-bold uppercase tracking-[0.24em] text-[#E63843]">
               EXPERIENCE {experience.number} / {String(total).padStart(2, "0")}
             </p>
             <h3 className="mt-2 truncate font-display text-[clamp(1.3rem,3vw,2.2rem)] font-extrabold uppercase tracking-tight text-[#F5F0E8]">

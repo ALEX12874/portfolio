@@ -26,7 +26,7 @@ function readableOn(accent: string): string {
 export default function ProjectCTA({ cta, accent, onOpenCaseStudy }: ProjectCTAProps) {
   // ≥ 18.66px bold = WCAG "large text": ivory on Signature Red passes 3:1
   const classes =
-    "pill inline-flex min-h-[48px] w-full items-center justify-center gap-2 px-7 py-3.5 text-[1.18rem] font-bold hover:opacity-90 active:opacity-80 sm:w-auto";
+    "pill inline-flex min-h-[48px] w-full items-center justify-center gap-2 px-7 py-3.5 text-[max(1.18rem,19px)] font-bold hover:opacity-90 active:opacity-80 sm:w-auto";
   const style = { backgroundColor: accent, color: readableOn(accent) };
 
   if (cta.kind === "external") {
