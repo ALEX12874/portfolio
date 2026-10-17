@@ -19,7 +19,7 @@ export default function PerspectivesSection() {
     >
       <DottedBackground tone="ivory" />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-28 pt-28 sm:px-8 lg:px-12 lg:pt-32">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[5.25rem] pt-[5.25rem] sm:px-8 sm:pb-28 sm:pt-28 lg:px-12 lg:pt-32">
         <SectionHeader
           id="perspectives"
           eyebrow={copy.eyebrow}

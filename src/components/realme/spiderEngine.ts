@@ -38,6 +38,8 @@ export interface EngineOptions {
   onSorted: () => void;
   /** Where bugs may land (keeps them off the text, nodes and bottom strip). */
   allow: (p: Pt) => boolean;
+  /** Calm motion: no bounce on the drop, bugs arrive less often. */
+  calm?: boolean;
 }
 
 type BugState = "fly" | "stuck" | "wrap" | "sorted" | "fade";
@@ -124,6 +126,11 @@ export class SpiderEngine {
   }
 
   /* ---------------------------------------------------------------- API */
+
+  /** Whether this engine runs the calm (reduced-motion) variant. */
+  get calm() {
+    return !!this.opts.calm;
+  }
 
   start() {
     if (this.running) return;
@@ -320,7 +327,8 @@ export class SpiderEngine {
       s.timer += dt / 1.15;
       const t = Math.min(1, s.timer);
       s.x = g.hub.x;
-      s.y = -this.opts.size + (g.hub.y + this.opts.size) * easeOutBack(t);
+      const e = this.opts.calm ? 1 - (1 - t) ** 3 : easeOutBack(t);
+      s.y = -this.opts.size + (g.hub.y + this.opts.size) * e;
       if (t >= 1) {
         s.state = "idle";
         s.y = g.hub.y;
@@ -425,7 +433,7 @@ export class SpiderEngine {
       this.spawnIn -= dt;
       if (this.spawnIn <= 0) {
         if (this.activeCount() < this.opts.cap) this.spawnRandom();
-        this.spawnIn = 2.5 + Math.random() * 1.5;
+        this.spawnIn = (2.5 + Math.random() * 1.5) * (this.opts.calm ? 1.6 : 1);
       }
     }
   }

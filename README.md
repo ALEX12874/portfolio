@@ -15,9 +15,17 @@ npm run build     # also regenerates public/sitemap.xml + robots.txt (prebuild)
 npm run preview
 ```
 
+## Checks before every deploy
+
+`npm run check` = typecheck + production build + a Playwright smoke test
+(scrolls the page, switches all 4 projects, opens both experiences, checks the
+spider counter rises and the billboard pops on hover and tap, and fails on
+any console error or failed request).
+
 ## Deploy (Vercel)
 
-Live at https://gouranglokwani.vercel.app. The Vercel project is connected to
+Live at https://gouranglokwani.vercel.app (custom domain https://gouranglokwani.in
+being connected). The Vercel project is connected to
 this (private) GitHub repo: every push to `main` deploys automatically.
 Environment variables live in Vercel → Project → Settings → Environment
 Variables; redeploy after changing them.
@@ -29,7 +37,8 @@ Copy `.env.example` to `.env.local` and fill in:
 | Variable | Purpose |
 | --- | --- |
 | `VITE_WEB3FORMS_KEY` | Contact-form delivery to Gmail via Web3Forms. |
-| `VITE_SITE_URL` | Public URL used by canonical, Open Graph, JSON-LD and the sitemap. Defaults to `https://gouranglokwani.vercel.app`. |
+| `VITE_SITE_URL` | Public URL used by canonical, Open Graph, JSON-LD and the sitemap. Defaults to `https://gouranglokwani.in`. |
+| `VITE_ENABLE_ANALYTICS` | Set to `1` after enabling Web Analytics in Vercel (Speed Insights needs no flag). |
 
 ### Contact form
 

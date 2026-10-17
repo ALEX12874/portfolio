@@ -1,9 +1,11 @@
-import { lazy } from "react";
+import { lazy, useEffect } from "react";
 import { LazyMotion, domAnimation } from "framer-motion";
 import TopBar from "./components/layout/TopBar";
 import Hero from "./components/hero/Hero";
 import Capabilities from "./components/skills/Capabilities";
 import DeferredSection from "./components/layout/DeferredSection";
+import RetryBoundary from "./components/layout/RetryBoundary";
+import { prefetchOnIdle } from "./lib/prefetch";
 
 // below the fold: separate chunks, rendered right after first paint
 const ProjectsSection = lazy(() => import("./components/projects/ProjectsSection"));
@@ -13,9 +15,13 @@ const PerspectivesSection = lazy(() => import("./components/perspectives/Perspec
 const Footer = lazy(() => import("./components/layout/Footer"));
 
 /**
- * Single-page portfolio: six sections + footer.
+ * Single-page portfolio: six sections + footer. Every section sits in its own
+ * error boundary, so one failing part never blanks the page.
  */
 export default function App() {
+  // after first paint, on idle: project logos + (desktop/tablet) the 3D chunk
+  useEffect(() => prefetchOnIdle(), []);
+
   return (
     // m.* components + the compact DOM feature set (no layout/drag features
     // are used) keep framer-motion's share of the bundle small
@@ -27,28 +33,32 @@ export default function App() {
       <TopBar />
 
       <main id="main">
-        <Hero />
+        <RetryBoundary id="home" label="the intro" tone="ivory" section>
+          <Hero />
+        </RetryBoundary>
 
-        <Capabilities />
+        <RetryBoundary id="capabilities" label="capabilities" tone="ink" section>
+          <Capabilities />
+        </RetryBoundary>
 
-        <DeferredSection id="projects" tone="#14342B">
+        <DeferredSection id="projects" tone="#14342B" label="the projects">
           <ProjectsSection />
         </DeferredSection>
 
-        <DeferredSection id="experience" tone="#151515">
+        <DeferredSection id="experience" tone="#151515" label="the experience">
           <ExperienceSection />
         </DeferredSection>
 
-        <DeferredSection id="real-me" tone="#EFE8DC">
+        <DeferredSection id="real-me" tone="#EFE8DC" label="The Real Me">
           <RealMeSection />
         </DeferredSection>
 
-        <DeferredSection id="perspectives" tone="#F5F0E8">
+        <DeferredSection id="perspectives" tone="#F5F0E8" label="the perspectives">
           <PerspectivesSection />
         </DeferredSection>
       </main>
 
-      <DeferredSection id="contact" tone="#151515">
+      <DeferredSection id="contact" tone="#151515" label="the contact section">
         <Footer />
       </DeferredSection>
     </LazyMotion>

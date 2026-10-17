@@ -118,7 +118,7 @@ export default function InayatEnv() {
       {/* the logo as a charcoal perfume label on paper */}
       <div className="absolute inset-0 flex items-center justify-center">
         <figure
-          className="logo-plate p-3 sm:p-4"
+          className="logo-plate logo-plate--phone55 p-3 sm:p-4"
           style={{
             width: "min(44%, 240px)",
             background: "#1A1917",

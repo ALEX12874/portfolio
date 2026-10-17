@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { assets } from "../../../data/assets";
+import { useMotionLevel } from "../../../hooks/useMotionLevel";
 
 /*
  * One coordinate system: viewBox 0 0 800 600 (the stage is 4:3 on every
@@ -102,17 +102,17 @@ function Truck({ spin }: { spin: boolean }) {
 }
 
 /** A truck driving the lane: tilts with the road, shrinks with distance, fades at the ends. */
-function MovingTruck({ begin, scale }: { begin: number; scale: number }) {
+function MovingTruck({ begin, scale, loop = LOOP_S }: { begin: number; scale: number; loop?: number }) {
   return (
     <g opacity={0}>
-      <animateMotion dur={`${LOOP_S}s`} begin={`${begin}s`} repeatCount="indefinite" rotate="auto">
+      <animateMotion dur={`${loop}s`} begin={`${begin}s`} repeatCount="indefinite" rotate="auto">
         <mpath href="#wrepd-lane" />
       </animateMotion>
       <animate
         attributeName="opacity"
         values="0;1;1;0"
         keyTimes="0;0.08;0.92;1"
-        dur={`${LOOP_S}s`}
+        dur={`${loop}s`}
         begin={`${begin}s`}
         repeatCount="indefinite"
       />
@@ -123,33 +123,12 @@ function MovingTruck({ begin, scale }: { begin: number; scale: number }) {
           type="scale"
           from={`${1.1 * scale}`}
           to={`${0.75 * scale}`}
-          dur={`${LOOP_S}s`}
+          dur={`${loop}s`}
           begin={`${begin}s`}
           repeatCount="indefinite"
         />
         <Truck spin />
       </g>
-    </g>
-  );
-}
-
-/** Reduced motion: one truck parked mid-road, tilted to the road tangent. */
-function StaticTruck() {
-  const ref = useRef<SVGGElement | null>(null);
-  useEffect(() => {
-    const g = ref.current;
-    const path = g?.ownerSVGElement?.querySelector<SVGPathElement>("#wrepd-lane");
-    if (!g || !path) return;
-    const len = path.getTotalLength();
-    const at = len * 0.42;
-    const p = path.getPointAtLength(at);
-    const q = path.getPointAtLength(at + 1);
-    const deg = (Math.atan2(q.y - p.y, q.x - p.x) * 180) / Math.PI;
-    g.setAttribute("transform", `translate(${p.x} ${p.y}) rotate(${deg}) scale(0.95)`);
-  }, []);
-  return (
-    <g ref={ref}>
-      <Truck spin={false} />
     </g>
   );
 }
@@ -160,10 +139,8 @@ function StaticTruck() {
  * curves, subtle speed lines and GPS pins above the road (never on the logo).
  */
 export default function WrepdEnv() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, []);
+  // calm motion: the trucks keep driving, at half speed
+  const calm = useMotionLevel() === "calm";
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -197,15 +174,13 @@ export default function WrepdEnv() {
         <g fill="none" stroke="#F5F0E8" strokeLinecap="round" opacity={0.2}>
           {[-70, -112].map((dy, i) => (
             <path key={dy} d={LANE} transform={`translate(0 ${dy})`} strokeWidth={3} strokeDasharray="70 520">
-              {reduced ? null : (
-                <animate
-                  attributeName="stroke-dashoffset"
-                  from="590"
-                  to="0"
-                  dur={`${3.4 + i * 0.7}s`}
-                  repeatCount="indefinite"
-                />
-              )}
+              <animate
+                attributeName="stroke-dashoffset"
+                from="590"
+                to="0"
+                dur={`${(3.4 + i * 0.7) * (calm ? 2 : 1)}s`}
+                repeatCount="indefinite"
+              />
             </path>
           ))}
         </g>
@@ -227,14 +202,8 @@ export default function WrepdEnv() {
         />
 
         {/* trucks */}
-        {reduced ? (
-          <StaticTruck />
-        ) : (
-          <>
-            <MovingTruck begin={-LOOP_S * 0.65} scale={0.8} />
-            <MovingTruck begin={0} scale={1} />
-          </>
-        )}
+        <MovingTruck begin={-LOOP_S * (calm ? 2 : 1) * 0.65} scale={0.8} loop={LOOP_S * (calm ? 2 : 1)} />
+        <MovingTruck begin={0} scale={1} loop={LOOP_S * (calm ? 2 : 1)} />
       </svg>
 
       {/* GPS pins: above the road, clear of the logo plate */}
@@ -254,7 +223,7 @@ export default function WrepdEnv() {
       {/* logo plate — white, matching the logo's own background */}
       <div className="absolute inset-0 flex items-start justify-center pt-[6%]">
         <figure
-          className="logo-plate logo-plate--wide border-[rgba(21,21,21,0.25)] bg-white p-2 shadow-[0_26px_70px_rgba(21,21,21,0.35)] sm:p-4"
+          className="logo-plate logo-plate--wide logo-plate--phone55 border-[rgba(21,21,21,0.25)] bg-white p-2 shadow-[0_26px_70px_rgba(21,21,21,0.35)] sm:p-4"
           style={{ width: "min(37%, 260px)" }}
         >
           <img

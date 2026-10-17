@@ -33,6 +33,28 @@ window.addEventListener("vite:preloadError", (event) => {
 
 // `?capture=1` renders only the hero scene for the video export script
 const capture = new URLSearchParams(window.location.search).get("capture") === "1";
+
+// Real-visitor performance (Vercel Speed Insights) — and Web Analytics once
+// it is enabled for the project (set VITE_ENABLE_ANALYTICS=1). Only on the
+// deployed site, after load and on idle, so it never competes with the page.
+// No other trackers.
+const deployed = !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+if (deployed && !capture) {
+  const start = () => {
+    void import("@vercel/speed-insights").then(({ injectSpeedInsights }) => injectSpeedInsights());
+    if (import.meta.env.VITE_ENABLE_ANALYTICS === "1") {
+      void import("@vercel/analytics").then(({ inject }) => inject());
+    }
+  };
+  const idle = () => {
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
+      .requestIdleCallback;
+    if (ric) ric(start, { timeout: 4000 });
+    else setTimeout(start, 2000);
+  };
+  if (document.readyState === "complete") idle();
+  else window.addEventListener("load", idle, { once: true });
+}
 const HeroCapture = lazy(() => import("./components/hero/HeroCapture"));
 
 createRoot(container).render(

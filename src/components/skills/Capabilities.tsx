@@ -5,7 +5,8 @@ import SkillNavigation from "./SkillNavigation";
 import SkillPanel from "./SkillPanel";
 import RetryBoundary from "../layout/RetryBoundary";
 import { sectionHeadings } from "../../data/site";
-import { useActiveInView, useNearViewport } from "../../hooks/useInView";
+import { useNearViewport } from "../../hooks/useInView";
+import { useSceneTurn } from "../../lib/sceneArbiter";
 
 // 3D is lazy-loaded so three.js stays out of the first paint
 const SolarSystem = lazy(() => import("./SolarSystem"));
@@ -18,7 +19,9 @@ const SolarSystem = lazy(() => import("./SolarSystem"));
 export default function Capabilities() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const { ref, active } = useActiveInView<HTMLElement>(0.04);
+  // one WebGL scene at a time: the orbit renders only while it is the most
+  // visible 3D scene (the live hero pauses meanwhile, and vice versa)
+  const { ref, active } = useSceneTurn<HTMLElement>("solar");
   // three.js is only fetched once the section is ~600px from the viewport
   const { ref: nearRef, near } = useNearViewport<HTMLDivElement>("600px");
   const copy = sectionHeadings.capabilities;
@@ -42,7 +45,7 @@ export default function Capabilities() {
     >
       <DottedBackground tone="ink" />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-20 pt-28 sm:px-8 lg:px-12 lg:pb-24 lg:pt-32">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[3.75rem] pt-[5.25rem] sm:px-8 sm:pb-20 sm:pt-28 lg:px-12 lg:pb-24 lg:pt-32">
         <SectionHeader
           id="capabilities"
           eyebrow={copy.eyebrow}

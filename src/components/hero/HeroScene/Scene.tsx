@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import Road from "./Road";
@@ -10,16 +10,38 @@ import Environment from "./Environment";
 import Rig from "./Rig";
 import { CAPTURE, CAPTURE_VARIANT } from "./clock";
 
+/**
+ * Quality tier: "high" on landscape screens ≥ 900 px; "low" on tablets
+ * (dpr ≤ 1.25, no shadows, half the pedestrians).
+ */
+export type SceneTier = "high" | "low";
+
 interface SceneProps {
   /** Pause the render loop while the hero is off-screen. */
   active: boolean;
-  /** Pointer parallax (disabled on touch / reduced motion). */
+  /** Pointer parallax (disabled on touch / calm motion). */
   parallax: boolean;
+  tier?: SceneTier;
   /** Called once if the device can't hold its frame rate (or loses WebGL). */
   onLowFps?: () => void;
+  /** Called once shaders are compiled and the first frames are on screen. */
+  onReady?: () => void;
 }
 
-/** Camera framings: live = the designed hero; phone = tighter on the board. */
+interface Quality {
+  dpr: number;
+  shadows: boolean;
+  crowd: "full" | "half";
+}
+
+const QUALITY: Record<SceneTier, Quality> = {
+  high: { dpr: 1.5, shadows: true, crowd: "full" },
+  low: { dpr: 1.25, shadows: false, crowd: "half" },
+};
+/** The one cheaper step tried before giving up on live 3D. */
+const CHEAPEST: Quality = { dpr: 1, shadows: false, crowd: "half" };
+
+/** Camera framings: live = the designed hero; wide/phone = the two videos. */
 interface Framing {
   position: [number, number, number];
   lookAt: [number, number, number];
@@ -29,8 +51,9 @@ const LIVE: Framing = { position: [24.37, 2.2, 6.31], lookAt: [-7.3, 7.5, -2.61]
 const FRAMINGS: Record<"wide" | "phone", Framing> = {
   // 1280×1024 video: board ≈ 76% of the width, crowd + car at the base
   wide: { position: [24.37, 2.2, 6.31], lookAt: [-7.3, 7.0, -2.61], fov: 27 },
-  // 960×864 video: board ≥ 92% of the width, every letter visible
-  phone: { position: [24.37, 2.2, 6.31], lookAt: [-7.07, 6.8, -3.36], fov: 25.3 },
+  // 960×864 video, zoomed out: board ≈ 70% of the width with both towers,
+  // the crowd and the road in frame
+  phone: { position: [24.37, 2.2, 6.31], lookAt: [-7.07, 5.9, -3.36], fov: 33.3 },
 };
 
 /** `?cam=x,y,z&look=x,y,z&fov=n` overrides the capture camera (tuning only). */
@@ -59,8 +82,11 @@ declare global {
 function CaptureController() {
   const advance = useThree((s) => s.advance);
   const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
   useEffect(() => {
     (window as unknown as { __heroScene?: THREE.Scene }).__heroScene = scene;
+    // used by scripts/render-hero.mjs to measure the billboard in each video
+    (window as unknown as { __heroCamera?: THREE.Camera }).__heroCamera = camera;
     THREE.DefaultLoadingManager.onLoad = () => {
       window.__heroAssetsReady = true;
     };
@@ -69,30 +95,67 @@ function CaptureController() {
     return () => {
       window.__setSceneTime = undefined;
     };
-  }, [advance, scene]);
+  }, [advance, scene, camera]);
   return null;
 }
 
-const WARMUP_S = 0.6; // ignore shader-compile frames
-const SAMPLE_S = 2; // then average frame time over ~2 s
-const SLOW_MS = 24; // ≈ 42 fps
+const WARMUP_S = 2.5; // skip shader compile + texture upload after the first frame
+const REWARM_S = 1; // settle time after stepping quality down
+const SAMPLE_S = 3; // then take the median frame time over 3 s
+const SLOW_MS = 40; // median slower than 25 fps = too slow
 
-/** Adaptive quality guard: measures the average frame time after mount. */
-function FrameGuard({ onLowFps }: { onLowFps?: () => void }) {
-  const t = useRef({ elapsed: 0, sampled: 0, frames: 0, done: false });
+/**
+ * Adaptive quality guard. Waits out the heavy first seconds, then measures
+ * the *median* frame time (spikes don't count). Too slow: `onSlow` either
+ * steps quality down (returns true → measure again) or gives up.
+ */
+function FrameGuard({ onSlow }: { onSlow: () => boolean }) {
+  const t = useRef({ wait: WARMUP_S, sampled: 0, samples: [] as number[], done: false });
   useFrame((_, delta) => {
     const s = t.current;
-    if (s.done || !onLowFps) return;
-    s.elapsed += delta;
-    if (s.elapsed < WARMUP_S) return;
-    s.sampled += delta;
-    s.frames += 1;
-    if (s.sampled >= SAMPLE_S) {
-      s.done = true;
-      const avgMs = (s.sampled / s.frames) * 1000;
-      if (avgMs > SLOW_MS) onLowFps();
+    if (s.done) return;
+    if (s.wait > 0) {
+      s.wait -= delta;
+      return;
     }
+    s.samples.push(delta * 1000);
+    s.sampled += delta;
+    if (s.sampled < SAMPLE_S) return;
+    const sorted = [...s.samples].sort((a, b) => a - b);
+    const median = sorted[sorted.length >> 1];
+    if (median > SLOW_MS && onSlow()) {
+      s.wait = REWARM_S;
+      s.sampled = 0;
+      s.samples = [];
+      return;
+    }
+    s.done = true;
   });
+  return null;
+}
+
+/**
+ * Pre-compiles every shader while the poster still covers the stage, then
+ * reports ready after a few rendered frames, so the crossfade never janks.
+ */
+function Warmup({ onReady }: { onReady?: () => void }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    try {
+      gl.compile(scene, camera);
+    } catch {
+      // compile is an optimisation only
+    }
+    let frames = 0;
+    let raf = 0;
+    const tick = () => {
+      frames += 1;
+      if (frames >= 3) onReady?.();
+      else raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [gl, scene, camera, onReady]);
   return null;
 }
 
@@ -128,12 +191,30 @@ const CARS = [
  * - Fog: 52 → 115, so the near ink skyline keeps its colour and only the far
  *   row dissolves into the page.
  */
-export default function Scene({ active, parallax, onLowFps }: SceneProps) {
+export default function Scene({ active, parallax, tier = "high", onLowFps, onReady }: SceneProps) {
   const framing = CAPTURE ? captureFraming() : LIVE;
+  const [quality, setQuality] = useState<Quality>(() => (CAPTURE ? QUALITY.high : QUALITY[tier]));
+  const qualityRef = useRef(quality);
+  qualityRef.current = quality;
+
+  // first try one cheaper step (dpr 1, no shadows, half the crowd); only if
+  // that is still too slow does the hero hand over to the video
+  const onSlow = useCallback(() => {
+    const q = qualityRef.current;
+    if (q.dpr > CHEAPEST.dpr || q.shadows || q.crowd === "full") {
+      setQuality(CHEAPEST);
+      return true;
+    }
+    onLowFps?.();
+    return false;
+  }, [onLowFps]);
+
+  const crowd = quality.crowd === "full" ? pedestrians : pedestrians.filter((_, i) => i % 2 === 0);
+
   return (
     <Canvas
       shadows
-      dpr={CAPTURE ? 1 : [1, 1.75]}
+      dpr={CAPTURE ? 1 : [1, quality.dpr]}
       frameloop={CAPTURE ? "never" : active ? "always" : "never"}
       gl={{
         antialias: true,
@@ -160,7 +241,7 @@ export default function Scene({ active, parallax, onLowFps }: SceneProps) {
         );
       }}
     >
-      {CAPTURE ? <CaptureController /> : <FrameGuard onLowFps={onLowFps} />}
+      {CAPTURE ? <CaptureController /> : <FrameGuard onSlow={onSlow} />}
 
       {/* haze: crisp foreground, far row dissolving into the ivory page */}
       <fog attach="fog" args={["#F5F0E8", 52, 115]} />
@@ -171,7 +252,7 @@ export default function Scene({ active, parallax, onLowFps }: SceneProps) {
 
       {/* key sun — warm, from the camera side, casts across the road */}
       <directionalLight
-        castShadow
+        castShadow={quality.shadows}
         position={[3.5, 11, 2]}
         intensity={2.2}
         color="#FFF6E8"
@@ -202,12 +283,13 @@ export default function Scene({ active, parallax, onLowFps }: SceneProps) {
             {CARS.map((c, i) => (
               <Car key={i} {...c} />
             ))}
-            {pedestrians.map((p) => (
+            {crowd.map((p) => (
               <Pedestrian key={p.id} cfg={p} />
             ))}
             <Billboard />
           </group>
         </Rig>
+        {CAPTURE ? null : <Warmup onReady={onReady} />}
       </Suspense>
     </Canvas>
   );

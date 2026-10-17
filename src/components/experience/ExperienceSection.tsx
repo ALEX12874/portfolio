@@ -41,7 +41,7 @@ export default function ExperienceSection() {
       aria-labelledby="experience-heading"
       className="on-ink relative bg-[#151515] text-[#F5F0E8]"
     >
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-24 pt-28 sm:px-8 lg:px-12 lg:pt-32">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[4.5rem] pt-[5.25rem] sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 lg:pt-32">
         <SectionHeader
           id="experience"
           eyebrow={copy.eyebrow}

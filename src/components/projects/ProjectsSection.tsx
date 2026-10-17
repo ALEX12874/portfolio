@@ -12,6 +12,7 @@ import { projects, defaultProjectId } from "../../data/projects";
 import type { ProjectId } from "../../data/projects";
 import { sectionHeadings } from "../../data/site";
 import { useActiveInView } from "../../hooks/useInView";
+import { decodedOrTimeout, preloadProjectLogos, whenIdle } from "../../lib/prefetch";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -39,9 +40,24 @@ export default function ProjectsSection() {
   const project = projects.find((p) => p.id === activeId) ?? projects[0];
   const index = projects.indexOf(project);
 
+  // all four logos are decoded as soon as the section is around
+  useEffect(() => whenIdle(preloadProjectLogos, 600), []);
+
+  // switch only once the next logo is decoded (≤ 160 ms wait), so the new
+  // world never shows a blank frame; the latest request wins
+  const pending = useRef(0);
+  const select = (id: ProjectId) => {
+    const next = projects.find((p) => p.id === id);
+    if (!next || id === activeId) return;
+    const token = ++pending.current;
+    void decodedOrTimeout(next.logo).then(() => {
+      if (token === pending.current) setActiveId(id);
+    });
+  };
+
   const go = (delta: number) => {
     const next = (index + delta + projects.length) % projects.length;
-    setActiveId(projects[next].id);
+    select(projects[next].id);
   };
 
   const openCaseStudy = () => {
@@ -109,7 +125,7 @@ export default function ProjectsSection() {
       />
       <DottedBackground tone={light ? "ivory" : "ink"} />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-24 pt-28 sm:px-8 lg:px-12 lg:pt-32">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[4.5rem] pt-[5.25rem] sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 lg:pt-32">
         <SectionHeader
           id="projects"
           eyebrow={sectionHeadings.projects.eyebrow}
@@ -119,7 +135,7 @@ export default function ProjectsSection() {
         />
 
         <div className="mt-10 lg:mt-14">
-          <ProjectSelector activeId={activeId} onSelect={setActiveId} />
+          <ProjectSelector activeId={activeId} onSelect={select} />
         </div>
 
         <div className="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[1.08fr_0.92fr] lg:gap-8">

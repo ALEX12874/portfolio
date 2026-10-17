@@ -19,7 +19,7 @@ const AZ_DEFAULT = 0.35;
 /** Ease back to AZ_DEFAULT this long after the last drag. */
 const RETURN_AFTER_MS = 4000;
 /** Outer orbit share of the canvas: width on portrait, height on landscape. */
-const FILL_PORTRAIT_W = 0.92;
+const FILL_PORTRAIT_W = 0.8; // phones: zoomed out a little, same angle
 const FILL_LANDSCAPE_H = 0.88;
 /** Headroom for planet bodies/rings sticking out of the outer orbit. */
 const PLANET_MARGIN = 1.6;
@@ -80,7 +80,7 @@ export default function CameraControls({ enabled }: CameraControlsProps) {
     };
 
     el.addEventListener("pointerdown", onDown);
-    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     return () => {

@@ -91,6 +91,11 @@ section[id] {
 .h2 {
   font-size: var(--size-h2);
 }
+@media (max-width: 639px) {
+  .h2 {
+    font-size: clamp(1.9rem, 8.4vw, 2.4rem);
+  }
+}
 
 .eyebrow {
   display: inline-flex;
@@ -220,22 +225,13 @@ section[id] {
   }
 }
 
-/* ------------------------------------------------ reduced motion */
+/* ------------------------------------------------ reduced motion = calm */
+/* Calm, not frozen: fades and slow loops keep playing (slower); only big
+   movements, bounces and fast flashing are removed. JS-driven motion asks
+   useMotionLevel() for the same policy. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-
-  .marker {
-    background-size: 100% 42%;
   }
 }
 
@@ -306,10 +302,10 @@ section[id] {
   .logo-slab {
     width: var(--slab, min(66cqh, 80cqw));
   }
-  /* phones: ≈ 60% of the stage width */
+  /* phones: ≈ 55% of the stage width */
   @media (max-width: 639px) {
     .logo-slab {
-      width: var(--slab, min(66cqh, 60cqw));
+      width: var(--slab, 55%);
     }
   }
 }
@@ -463,19 +459,6 @@ section[id] {
   }
 }
 
-.logo-slab--static .logo-slab__float,
-.logo-slab--static .logo-slab__floor,
-.logo-slab--static .logo-slab__sweep {
-  animation: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .logo-slab__float,
-  .logo-slab__floor,
-  .logo-slab__sweep {
-    animation: none;
-  }
-}
 
 .leaf-drift {
   animation: leaf-drift 11s ease-in-out infinite;
@@ -715,9 +698,10 @@ section[id] {
   }
 }
 
-/* phone name sizing: both words fully visible at 320–430 px */
+/* phone name sizing: both words fully visible at 320–430 px (calmer
+   phone scale: ~12% under the old 2.6–4.4 rem) */
 .hero-copy h1 {
-  font-size: clamp(2.6rem, 13.5vw, 4.4rem);
+  font-size: clamp(2.3rem, 11.9vw, 3.9rem);
 }
 @media (min-width: 768px) {
   .hero-copy h1 {
@@ -770,7 +754,7 @@ section[id] {
 
 /* ---- 05 / THE REAL ME — the spider-web scene --------------------------- */
 .realme-title {
-  font-size: clamp(2.1rem, 9.4vw, 3.6rem);
+  font-size: clamp(1.85rem, 8.3vw, 3.6rem);
   line-height: 0.92;
 }
 .realme-copy {
@@ -830,10 +814,6 @@ section[id] {
 .realme-web.is-drawn .web-rings path {
   animation: web-draw 0.38s ease-out forwards;
 }
-.realme-web.is-static path {
-  stroke-dashoffset: 0;
-  animation: none !important;
-}
 @keyframes web-draw {
   to {
     stroke-dashoffset: 0;
@@ -847,10 +827,6 @@ section[id] {
 }
 .realme-web.is-drawn .web-dew circle {
   animation: dew-glint 3.6s ease-in-out 1.8s infinite;
-}
-.realme-web.is-static .web-dew circle {
-  opacity: 0.85;
-  animation: none;
 }
 @keyframes dew-glint {
   0%,
@@ -1007,11 +983,6 @@ section[id] {
 .web-bug.is-sorted .web-bug__tag {
   animation: tag-pop 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
-.web-bug.is-static .web-bug__tag {
-  animation: none;
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-}
 @keyframes tag-pop {
   0% {
     opacity: 0;
@@ -1150,10 +1121,188 @@ section[id] {
 .realme[data-paused="true"] *::before {
   animation-play-state: paused !important;
 }
+/* calm: no wing flicker (fast flashing), no tag bounce, slower web drawing */
 @media (prefers-reduced-motion: reduce) {
-  .spider-breathe,
-  .bug-wing,
-  .web-dew circle {
+  .bug-wing {
     animation: none !important;
   }
+  .realme-web.is-drawn .web-spokes path {
+    animation-duration: 1.5s;
+  }
+  .realme-web.is-drawn .web-rings path {
+    animation-duration: 0.8s;
+  }
+  .web-bug.is-sorted .web-bug__tag {
+    animation: tag-fade 1.4s ease forwards;
+  }
+}
+@keyframes tag-fade {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%);
+  }
+  20%,
+  80% {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translateX(-50%);
+  }
+}
+
+/* calm motion (reduced-motion preference): the same loops, slower.
+   Kept last so these durations win over the base animation shorthands. */
+@media (prefers-reduced-motion: reduce) {
+  .logo-slab__float,
+  .logo-slab__floor {
+    animation-duration: 10s;
+  }
+  .logo-slab__sweep {
+    animation-duration: 12s;
+  }
+  .leaf-drift,
+  .fragrance-dot {
+    animation-duration: 18s;
+  }
+  .gps-ping,
+  .dash-flow {
+    animation-duration: 5.6s;
+  }
+}
+
+/* ---- hero billboard pop (video / poster mode) ---------------------------
+   A flat copy of the billboard, mapped onto the board in the video with a
+   homography (transform-origin 0 0). Sizes are in board pixels (1680 × 576,
+   1 px = 0.01 scene units), so shadows look the same after the mapping. */
+.hero-pop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  --pop: 0;
+  filter: drop-shadow(0 calc(var(--pop) * 110px) calc(var(--pop) * 150px) rgba(21, 21, 21, 0.35))
+    drop-shadow(0 0 calc(var(--pop) * 210px) rgba(230, 56, 67, 0.6));
+}
+.hero-pop__bezel {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: #151515;
+}
+.hero-pop__bezel::before {
+  /* thin red bezel between the ink box and the artwork */
+  content: "";
+  position: absolute;
+  inset: 20px;
+  background: #e63843;
+}
+.hero-pop__art {
+  position: absolute;
+  inset: 40px;
+  /* same crop as the 3D texture: the left 19.3% (empty red band) is cut */
+  background-size: 123.9% 100%;
+  background-position: 100% 50%;
+  background-repeat: no-repeat;
+}
+.hero-pop__led {
+  position: absolute;
+  background: repeating-linear-gradient(90deg, #d8ff63 0 43px, transparent 43px 53.3px);
+  box-shadow: 0 0 6px rgba(216, 255, 99, 0.55);
+  animation: led-chase 3s linear infinite;
+}
+.hero-pop__led--top,
+.hero-pop__led--bottom {
+  left: 5px;
+  right: 5px;
+  height: 16px;
+}
+.hero-pop__led--top {
+  top: 2px;
+}
+.hero-pop__led--bottom {
+  bottom: 2px;
+  animation-direction: reverse;
+}
+.hero-pop__led--left,
+.hero-pop__led--right {
+  top: 13px;
+  bottom: 13px;
+  width: 16px;
+  background: repeating-linear-gradient(180deg, #d8ff63 0 43px, transparent 43px 53.3px);
+  animation-name: led-chase-v;
+}
+.hero-pop__led--left {
+  left: 2px;
+  animation-direction: reverse;
+}
+.hero-pop__led--right {
+  right: 2px;
+}
+@keyframes led-chase {
+  to {
+    background-position-x: 160px;
+  }
+}
+@keyframes led-chase-v {
+  to {
+    background-position-y: 160px;
+  }
+}
+.hero-pop__label {
+  position: absolute;
+  z-index: 2;
+  white-space: nowrap;
+  border: 1px solid rgba(21, 21, 21, 0.25);
+  border-radius: 999px;
+  background: rgba(245, 240, 232, 0.96);
+  padding: 0.35rem 0.75rem;
+  color: #151515;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 4px));
+  transition:
+    opacity 0.3s ease,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.hero-pop__label.is-on {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 14px));
+}
+.hero-hotspot {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hero-hotspot:focus-visible {
+  outline: 2px dashed #d8ff63;
+  outline-offset: 4px;
+}
+
+/* ---- phones: project logos at ~55% of the 4:3 stage width ---- */
+@media (max-width: 639px) {
+  .logo-plate--phone55 {
+    width: 55% !important;
+  }
+  /* Synkk keeps its workflow row underneath: as wide as the height allows */
+  .logo-plate.synkk-logo {
+    width: min(55%, 44vw - 24px);
+  }
+}
+
+/* below-the-fold sections without fixed overlays or running scenes: the
+   browser may skip their rendering work until they come near the viewport */
+#perspectives,
+#contact {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1200px;
 }

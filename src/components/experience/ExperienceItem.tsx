@@ -21,7 +21,7 @@ export default function ExperienceItem({ experience, onOpen }: ExperienceItemPro
       type="button"
       onClick={() => onOpen(experience, rowRef.current as HTMLElement)}
       aria-label={`${experience.company} — ${experience.role}: open details`}
-      className="group relative block w-full border-b border-[rgba(245,240,232,0.14)] py-7 text-left transition-transform duration-500 ease-editorial hover:translate-x-2 sm:py-9"
+      className="group relative block w-full border-b border-[rgba(245,240,232,0.14)] py-6 text-left transition-transform duration-500 ease-editorial hover:translate-x-2 sm:py-9"
     >
       {/* indicator line draws in on hover/focus */}
       <span

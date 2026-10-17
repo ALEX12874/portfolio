@@ -11,7 +11,7 @@ import SceneErrorBoundary from "../layout/SceneErrorBoundary";
 import { PLANET_LAYOUT } from "./planets";
 import { skills } from "../../data/skills";
 import { useWebGLSupport } from "../../hooks/useWebGLSupport";
-import { usePrefersReducedMotion } from "../../hooks/useReducedMotion";
+import { useMotionLevel } from "../../hooks/useMotionLevel";
 
 interface SolarSystemProps {
   selectedId: string | null;
@@ -22,6 +22,10 @@ interface SolarSystemProps {
 }
 
 const DUST = 650;
+
+/** Pixel-ratio cap: 1.25 on tablets, 1.5 elsewhere. */
+const DPR_CAP =
+  typeof window !== "undefined" && window.matchMedia("(min-width: 768px) and (max-width: 1023px)").matches ? 1.25 : 1.5;
 
 /** Faint ivory star dust around (never inside) the system. */
 function StarDust() {
@@ -95,7 +99,8 @@ export default function SolarSystem({
   active,
 }: SolarSystemProps) {
   const webgl = useWebGLSupport();
-  const reduced = usePrefersReducedMotion();
+  // calm motion: same living system, orbits at half speed
+  const calm = useMotionLevel() === "calm";
 
   const fallback = (
     <SolarFallback selectedId={selectedId} hoveredId={hoveredId} onSelect={onSelect} onHover={onHover} />
@@ -111,7 +116,7 @@ export default function SolarSystem({
     >
       <SceneErrorBoundary fallback={fallback}>
         <Canvas
-          dpr={[1, 1.6]}
+          dpr={[1, DPR_CAP]}
           frameloop={active ? "always" : "never"}
           camera={{ position: [0, 9, 26], fov: 34, near: 0.1, far: 200 }}
           gl={{ antialias: true, alpha: true }}
@@ -125,7 +130,7 @@ export default function SolarSystem({
             <StudioEnvironment />
             <StarDust />
 
-            <Sun selected={selectedId === "brand-strategy"} onSelect={onSelect} animate={!reduced} />
+            <Sun selected={selectedId === "brand-strategy"} onSelect={onSelect} animate />
 
             {skills.map((s) => {
               const l = PLANET_LAYOUT[s.id];
@@ -147,14 +152,15 @@ export default function SolarSystem({
                 index={i}
                 selected={selectedId === s.id}
                 hovered={hoveredId === s.id}
-                animate={!reduced}
+                animate
+                pace={calm ? 0.5 : 1}
                 onHover={onHover}
                 onSelect={onSelect}
               />
             ))}
           </Suspense>
 
-          <CameraControls enabled={!reduced} />
+          <CameraControls enabled />
         </Canvas>
       </SceneErrorBoundary>
     </div>

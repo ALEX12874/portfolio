@@ -14,8 +14,9 @@ interface ProjectTransitionProps {
 
 /**
  * Reusable, token-driven transition system: a motif-coloured panel wipes
- * across the stage in one direction and out the other while the content
- * cross-fades. Consistent motion language (≈ 900ms) for every pair.
+ * across the stage while the two worlds cross-fade on top of each other.
+ * Opacity/transform only, ≤ 450 ms in total for every pair. The next logo is
+ * decoded before the switch (ProjectsSection), so there is no blank frame.
  */
 export default function ProjectTransition({
   theme,
@@ -24,14 +25,14 @@ export default function ProjectTransition({
 }: ProjectTransitionProps) {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* cross-fading atmosphere + motif */}
-      <AnimatePresence mode="wait">
+      {/* cross-fading atmosphere + motif (both layers absolute → true crossfade) */}
+      <AnimatePresence initial={false}>
         <m.div
           key={projectId}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4, ease: EASE }}
+          transition={{ duration: 0.32, ease: EASE }}
           className="absolute inset-0"
         >
           {children}
@@ -39,7 +40,7 @@ export default function ProjectTransition({
       </AnimatePresence>
 
       {/* token-driven wipe panel */}
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         <m.div
           key={`${projectId}-wipe`}
           aria-hidden="true"
@@ -50,8 +51,8 @@ export default function ProjectTransition({
             scaleX: [0, 1, 1, 0],
             transformOrigin: ["0% 50%", "0% 50%", "100% 50%", "100% 50%"],
           }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.9, ease: EASE, times: [0, 0.42, 0.5, 1] }}
+          exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          transition={{ duration: 0.45, ease: EASE, times: [0, 0.4, 0.48, 1] }}
         />
       </AnimatePresence>
     </div>

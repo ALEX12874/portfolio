@@ -28,7 +28,7 @@ export default function ProjectDetails({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: 0.28, ease: EASE }}
-      className="relative flex h-full flex-col rounded-xl border border-[var(--proj-line)] bg-[var(--proj-panel)] p-5 sm:p-8"
+      className="relative flex h-full flex-col rounded-xl border border-[var(--proj-line)] bg-[var(--proj-panel)] p-[1.0625rem] sm:p-8"
     >
       <p className="font-display text-[0.7rem] font-bold uppercase tracking-[0.22em] text-[var(--proj-accent)]">
         {project.number} / {project.name}

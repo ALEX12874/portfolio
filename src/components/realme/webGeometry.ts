@@ -57,10 +57,10 @@ export function buildWeb(W: number, H: number, hub: Pt, compact: boolean): WebGe
 
   // spiral rings: tight near the hub, widening outward (geometric spacing)
   const rings: number[] = [];
-  let r = compact ? 12 : 16;
+  let r = compact ? 9 : 16;
   while (r < R) {
     rings.push(r);
-    r = r * (compact ? 1.17 : 1.15) + (compact ? 7 : 9);
+    r = r * (compact ? 1.15 : 1.15) + (compact ? 5 : 9);
   }
 
   const radius = dirs.map(() => rings.map((rk) => rk * (1 + (rnd() - 0.5) * 0.05)));

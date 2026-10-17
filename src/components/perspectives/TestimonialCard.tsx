@@ -25,7 +25,7 @@ export default function TestimonialCard({ testimonial, index }: TestimonialCardP
       initial={{ opacity: 0, y: 28 }}
       animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
       transition={{ duration: 0.65, delay: (index % 3) * 0.09, ease: EASE }}
-      className="group relative flex h-full flex-col rounded-xl border border-[rgba(21,21,21,0.1)] bg-[rgba(245,240,232,0.75)] p-6 shadow-[0_6px_20px_rgba(21,21,21,0.05)] transition-all duration-500 ease-editorial hover:-translate-y-1 hover:border-[rgba(21,21,21,0.18)] hover:shadow-[0_18px_40px_rgba(21,21,21,0.12)] sm:p-7"
+      className="group relative flex h-full flex-col rounded-xl border border-[rgba(21,21,21,0.1)] bg-[rgba(245,240,232,0.75)] p-5 sm:p-6 shadow-[0_6px_20px_rgba(21,21,21,0.05)] transition-all duration-500 ease-editorial hover:-translate-y-1 hover:border-[rgba(21,21,21,0.18)] hover:shadow-[0_18px_40px_rgba(21,21,21,0.12)] sm:p-7"
     >
       {/* thin detail line appears on hover */}
       <span

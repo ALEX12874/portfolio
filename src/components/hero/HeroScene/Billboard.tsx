@@ -2,12 +2,52 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
-import { loopPeriod } from "./clock";
+import { CAPTURE, loopPeriod } from "./clock";
 import { assets } from "../../../data/assets";
 
 const FACE_W = 16; // ≈ 16 × 5 units with adult = 1.7
 const FACE_H = 4.96; // cropped-artwork aspect 3.228 : 1 — nothing is stretched
 const FACE_CY = 7.5; // face spans y 5.02 → 9.98, catwalk and crowd beneath
+
+/** Hover pop: scale, lift toward the camera, tilt toward the pointer. */
+const POP_SCALE = 1.08;
+const POP_LIFT = 0.35;
+const POP_TILT = THREE.MathUtils.degToRad(3);
+/** Springs: ~350 ms with ~3% overshoot in, ~450 ms back out. */
+const SPRING_IN = { k: 240, c: 23 };
+const SPRING_OUT = { k: 150, c: 21 };
+/** Tap (touch) pops the board for this long. */
+const TAP_HOLD_MS = 1600;
+
+/** Soft round red glow (radial gradient) for the hover halo. */
+function makeGlowTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, "rgba(230,56,67,0.9)");
+    g.addColorStop(0.45, "rgba(230,56,67,0.45)");
+    g.addColorStop(1, "rgba(230,56,67,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+interface Spring {
+  x: number;
+  v: number;
+}
+
+function stepSpring(s: Spring, target: number, dt: number, p: { k: number; c: number }) {
+  s.v += (p.k * (target - s.x) - p.c * s.v) * dt;
+  s.x += s.v * dt;
+}
 
 /** Soft diagonal light-sweep stripe, generated procedurally (no CDN assets). */
 function makeSweepTexture(): THREE.CanvasTexture {
@@ -77,10 +117,14 @@ function makeLedTexture(): THREE.CanvasTexture {
  *   wash the structure and pool on the pavement below.
  * - Attention motif: concentric lime ripple rings expand on the pavement
  *   (≤ 15% opacity, 5 s); a red halo breathes behind the panel (±4%, 7 s).
- * - Hover: ≤ 1.02 scale lift plus the small HTML label.
+ * - Hover (tap on touch): the board pops — 1.08 scale, 0.35 toward the
+ *   camera with a springy ease-out, tilts ~3° toward the pointer, brighter
+ *   lamp wash, LED chase ×2, a red glow halo and the small HTML label.
  */
+const tmpCenter = new THREE.Vector3();
+
 export default function Billboard() {
-  const { gl } = useThree();
+  const { gl, camera } = useThree();
 
   const faceTexture = useMemo(() => {
     const loader = new THREE.TextureLoader();
@@ -109,8 +153,24 @@ export default function Billboard() {
     return t;
   }, []);
 
+  const glowTexture = useMemo(() => makeGlowTexture(), []);
+
   const [hovered, setHovered] = useState(false);
-  const group = useRef<THREE.Group | null>(null);
+  const pop = useRef<THREE.Group | null>(null);
+  const hit = useRef<THREE.Mesh | null>(null);
+  const glow = useRef<THREE.MeshBasicMaterial | null>(null);
+  const lampMats = useRef<THREE.MeshStandardMaterial[]>([]);
+  const motion = useRef({
+    scale: { x: 1, v: 0 } as Spring,
+    lift: { x: 0, v: 0 } as Spring,
+    tiltX: 0,
+    tiltY: 0,
+    aimX: 0,
+    aimY: 0,
+    amount: 0,
+    extraChase: 0,
+  });
+  const tapTimer = useRef(0);
   const sweep = useRef<THREE.Mesh | null>(null);
   const halo = useRef<THREE.MeshBasicMaterial | null>(null);
   const ripples = useRef<THREE.Mesh[]>([]);
@@ -126,8 +186,17 @@ export default function Billboard() {
       sweepTexture.dispose();
       ledH.dispose();
       ledV.dispose();
+      glowTexture.dispose();
     };
-  }, [faceTexture, sweepTexture, ledH, ledV]);
+  }, [faceTexture, sweepTexture, ledH, ledV, glowTexture]);
+
+  useEffect(() => () => window.clearTimeout(tapTimer.current), []);
+
+  // state + on-screen position for the smoke test (and devtools)
+  useEffect(() => {
+    gl.domElement.dataset.billboardPopped = hovered ? "1" : "0";
+  }, [gl, hovered]);
+  const nextReport = useRef(0);
 
   useEffect(() => {
     document.body.style.cursor = hovered ? "pointer" : "";
@@ -146,53 +215,78 @@ export default function Billboard() {
     if (c && targetC.current) c.target = targetC.current;
   }, []);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDelta) => {
     const t = clock.getElapsedTime();
+    const dt = Math.min(rawDelta, 1 / 30);
+    const m = motion.current;
+
+    // hover amount (0 → 1) drives the wash, glow and chase speed
+    m.amount = THREE.MathUtils.lerp(m.amount, hovered ? 1 : 0, 1 - Math.exp(-dt * 9));
 
     // slow light sweep across the panel — one pass every 7 s
     if (sweep.current) sweepTexture.offset.x = (t / loopPeriod(7)) % 1;
 
-    // lime LED chase — one segment-cycle every 6 s, restrained
-    const chase = (t / loopPeriod(6)) % 1;
+    // lime LED chase — one segment-cycle every 6 s, twice as fast on hover
+    if (!CAPTURE) m.extraChase += (dt / 6) * m.amount;
+    const chase = (t / loopPeriod(6) + m.extraChase) % 1;
     ledH.offset.x = chase;
     ledV.offset.x = chase;
 
     // breathing halo behind the panel (±4%)
     if (halo.current) halo.current.opacity = 0.09 + Math.sin((t / loopPeriod(7)) * Math.PI * 2) * 0.03;
+    // hover glow halo fades in behind the face
+    if (glow.current) glow.current.opacity = 0.45 * m.amount;
 
     // attention ripples on the pavement — 5 s loop, staggered, ≤ 15% opacity
     ripples.current.forEach((mesh, i) => {
       if (!mesh) return;
-      const phase = ((t / loopPeriod(5) + i / 3) % 1);
+      const phase = (t / loopPeriod(5) + i / 3) % 1;
       const s = 0.55 + phase * 1.35;
       mesh.scale.setScalar(s);
       const mat = mesh.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.15 * (1 - phase) * Math.min(1, phase * 6);
     });
 
-    // restrained hover lift: ≤ 1.02 scale + brighter wash
-    if (group.current) {
-      const targetScale = hovered ? 1.015 : 1;
-      const s = THREE.MathUtils.lerp(group.current.scale.x, targetScale, 0.12);
-      group.current.scale.setScalar(s);
-      group.current.position.y = THREE.MathUtils.lerp(
-        group.current.position.y,
-        hovered ? 0.08 : 0,
-        0.12
-      );
+    // the pop: springy scale + lift toward the camera, tilt toward the pointer
+    if (pop.current) {
+      const spring = hovered ? SPRING_IN : SPRING_OUT;
+      stepSpring(m.scale, hovered ? POP_SCALE : 1, dt, spring);
+      stepSpring(m.lift, hovered ? POP_LIFT : 0, dt, spring);
+      const k = 1 - Math.exp(-dt * (hovered ? 10 : 7));
+      m.tiltX = THREE.MathUtils.lerp(m.tiltX, hovered ? m.aimY * POP_TILT : 0, k);
+      m.tiltY = THREE.MathUtils.lerp(m.tiltY, hovered ? -m.aimX * POP_TILT : 0, k);
+      pop.current.scale.setScalar(m.scale.x);
+      pop.current.position.z = m.lift.x;
+      pop.current.rotation.set(m.tiltX, m.tiltY, 0);
     }
-    const washTarget = hovered ? 170 : 115;
+
+    // brighter lamp wash while popped
+    const wash = 115 + 75 * m.amount;
     spots.current.forEach((sp) => {
-      if (sp) sp.intensity = THREE.MathUtils.lerp(sp.intensity, washTarget, 0.08);
+      if (sp) sp.intensity = wash;
     });
-    if (bounce.current) {
-      bounce.current.intensity = THREE.MathUtils.lerp(
-        bounce.current.intensity,
-        hovered ? 16 : 10,
-        0.08
-      );
+    if (bounce.current) bounce.current.intensity = 10 + 8 * m.amount;
+    lampMats.current.forEach((mat) => {
+      if (mat) mat.emissiveIntensity = 1.1 + 1.2 * m.amount;
+    });
+
+    // twice a second: where the board's centre is on the canvas (CSS px)
+    if (!CAPTURE && hit.current && t > nextReport.current) {
+      nextReport.current = t + 0.5;
+      hit.current.getWorldPosition(tmpCenter).project(camera);
+      const el = gl.domElement;
+      const x = ((tmpCenter.x + 1) / 2) * el.clientWidth;
+      const y = ((1 - tmpCenter.y) / 2) * el.clientHeight;
+      el.dataset.billboardAt = `${Math.round(x)},${Math.round(y)}`;
     }
   });
+
+  const onTap = () => {
+    // touch has no hover: a tap pops the board, which settles after 1.6 s
+    setHovered(true);
+    window.clearTimeout(tapTimer.current);
+    tapTimer.current = window.setTimeout(() => setHovered(false), TAP_HOLD_MS);
+  };
 
   /** Steel member material shared by the structure. */
   const steel = { color: "#151515", roughness: 0.55, metalness: 0.5 } as const;
@@ -202,15 +296,32 @@ export default function Billboard() {
 
   return (
     <group position={[-11.4, 0, -5]} rotation-y={0.5}>
-      {/* hover / label target */}
-      <group
-        ref={group}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-        }}
-        onPointerOut={() => setHovered(false)}
-      >
+      <group>
+        {/* invisible hit area: the whole board, frame and lamps (a little
+            bigger than the face), so the pop is easy to trigger */}
+        <mesh
+          ref={hit}
+          position={[0, FACE_CY + 0.3, 0.25]}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            if (e.pointerType !== "touch") setHovered(true);
+          }}
+          onPointerOut={(e) => {
+            if (e.pointerType !== "touch") setHovered(false);
+          }}
+          onPointerMove={(e) => {
+            if (!hit.current) return;
+            const local = hit.current.worldToLocal(e.point.clone());
+            motion.current.aimX = THREE.MathUtils.clamp(local.x / ((FACE_W + 1.6) / 2), -1, 1);
+            motion.current.aimY = THREE.MathUtils.clamp(local.y / 3.3, -1, 1);
+          }}
+          onClick={(e) => {
+            if ((e.nativeEvent as PointerEvent).pointerType === "touch") onTap();
+          }}
+        >
+          <boxGeometry args={[FACE_W + 1.6, 6.6, 1.4]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        </mesh>
         {/* ---- lattice towers: 4 chords, horizontal ties, diagonals ---- */}
         {[-5.5, 5.5].map((tx) => (
           <group key={tx} position={[tx, 0, 0]}>
@@ -324,110 +435,151 @@ export default function Billboard() {
           </mesh>
         ))}
 
-        {/* ---- layered frame: ink box → red bezel → LED strip → artwork ---- */}
-        <mesh position={[0, FACE_CY, -0.2]} castShadow>
-          <boxGeometry args={[FACE_W + 0.8, FACE_H + 0.8, 0.4]} />
-          <meshStandardMaterial {...steel} />
-        </mesh>
-        {/* thin red bezel */}
-        <mesh position={[0, FACE_CY, -0.02]}>
-          <boxGeometry args={[FACE_W + 0.4, FACE_H + 0.4, 0.12]} />
-          <meshStandardMaterial color="#E63843" roughness={0.5} metalness={0.1} />
-        </mesh>
+        {/* ---- the pop group: frame, artwork, halo and lamps, pivoting
+            around the face centre (towers and truss stay planted) ---- */}
+        <group position={[0, FACE_CY, 0]}>
+          <group ref={pop}>
+            <group position={[0, -FACE_CY, 0]}>
+              {/* ---- layered frame: ink box → red bezel → LED strip → artwork ---- */}
+              <mesh position={[0, FACE_CY, -0.2]} castShadow>
+                <boxGeometry args={[FACE_W + 0.8, FACE_H + 0.8, 0.4]} />
+                <meshStandardMaterial {...steel} />
+              </mesh>
+              {/* thin red bezel */}
+              <mesh position={[0, FACE_CY, -0.02]}>
+                <boxGeometry args={[FACE_W + 0.4, FACE_H + 0.4, 0.12]} />
+                <meshStandardMaterial color="#E63843" roughness={0.5} metalness={0.1} />
+              </mesh>
 
-        {/* lime LED edge strip — slow chase around the border (6 s loop) */}
-        <mesh position={[0, FACE_CY + 2.78, 0.06]}>
-          <planeGeometry args={[16.7, 0.16]} />
-          <meshBasicMaterial
-            map={ledH}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh position={[0, FACE_CY - 2.78, 0.06]} rotation-z={Math.PI}>
-          <planeGeometry args={[16.7, 0.16]} />
-          <meshBasicMaterial
-            map={ledH}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh position={[8.3, FACE_CY, 0.06]} rotation-z={-Math.PI / 2}>
-          <planeGeometry args={[5.5, 0.16]} />
-          <meshBasicMaterial
-            map={ledV}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh position={[-8.3, FACE_CY, 0.06]} rotation-z={Math.PI / 2}>
-          <planeGeometry args={[5.5, 0.16]} />
-          <meshBasicMaterial
-            map={ledV}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
+              {/* lime LED edge strip — slow chase around the border (6 s loop) */}
+              <mesh position={[0, FACE_CY + 2.78, 0.06]}>
+                <planeGeometry args={[16.7, 0.16]} />
+                <meshBasicMaterial
+                  map={ledH}
+                  transparent
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
+              <mesh position={[0, FACE_CY - 2.78, 0.06]} rotation-z={Math.PI}>
+                <planeGeometry args={[16.7, 0.16]} />
+                <meshBasicMaterial
+                  map={ledH}
+                  transparent
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
+              <mesh position={[8.3, FACE_CY, 0.06]} rotation-z={-Math.PI / 2}>
+                <planeGeometry args={[5.5, 0.16]} />
+                <meshBasicMaterial
+                  map={ledV}
+                  transparent
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
+              <mesh position={[-8.3, FACE_CY, 0.06]} rotation-z={Math.PI / 2}>
+                <planeGeometry args={[5.5, 0.16]} />
+                <meshBasicMaterial
+                  map={ledV}
+                  transparent
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
 
-        {/* artwork face — UV crop, exact colours preserved */}
-        <mesh position={[0, FACE_CY, 0.045]}>
-          <planeGeometry args={[FACE_W, FACE_H]} />
-          <meshBasicMaterial map={faceTexture} toneMapped={false} />
-        </mesh>
+              {/* artwork face — UV crop, exact colours preserved */}
+              <mesh name="billboard-face" position={[0, FACE_CY, 0.045]}>
+                <planeGeometry args={[FACE_W, FACE_H]} />
+                <meshBasicMaterial map={faceTexture} toneMapped={false} />
+              </mesh>
 
-        {/* subtle diagonal light sweep (7 s) */}
-        <mesh ref={sweep} position={[0, FACE_CY, 0.055]}>
-          <planeGeometry args={[FACE_W, FACE_H]} />
-          <meshBasicMaterial
-            map={sweepTexture}
-            transparent
-            opacity={0.12}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
+              {/* subtle diagonal light sweep (7 s) */}
+              <mesh ref={sweep} position={[0, FACE_CY, 0.055]}>
+                <planeGeometry args={[FACE_W, FACE_H]} />
+                <meshBasicMaterial
+                  map={sweepTexture}
+                  transparent
+                  opacity={0.12}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
 
-        {/* soft red halo behind the panel (breathing, ≤ 12% opacity) */}
-        <mesh position={[0, FACE_CY, -0.45]}>
-          <planeGeometry args={[17.6, 6.6]} />
-          <meshBasicMaterial
-            ref={halo}
-            color="#E63843"
-            transparent
-            opacity={0.09}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </mesh>
+              {/* hover glow: a soft red halo that fades in behind the face */}
+              <mesh position={[0, FACE_CY, -0.5]}>
+                <planeGeometry args={[26, 13]} />
+                <meshBasicMaterial
+                  ref={glow}
+                  map={glowTexture}
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
 
-        {/* ---- 6-lamp rig ---- */}
-        {LAMP_X.map((lx) => (
-          <group key={`lamp-${lx}`} position={[lx, 10.7, 0.1]}>
-            <mesh position={[0, 0.1, -0.22]} rotation-x={0.55} castShadow>
-              <cylinderGeometry args={[0.045, 0.045, 0.6, 8]} />
-              <meshStandardMaterial {...steel} />
-            </mesh>
-            <mesh position={[0, -0.14, 0.16]} rotation-x={0.72} castShadow>
-              <boxGeometry args={[0.6, 0.16, 0.3]} />
-              <meshStandardMaterial
-                color="#F5F0E8"
-                emissive="#F5F0E8"
-                emissiveIntensity={1.1}
-                toneMapped={false}
-              />
-            </mesh>
+              {/* soft red halo behind the panel (breathing, ≤ 12% opacity) */}
+              <mesh position={[0, FACE_CY, -0.45]}>
+                <planeGeometry args={[17.6, 6.6]} />
+                <meshBasicMaterial
+                  ref={halo}
+                  color="#E63843"
+                  transparent
+                  opacity={0.09}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
+
+              {/* ---- 6-lamp rig ---- */}
+              {LAMP_X.map((lx) => (
+                <group key={`lamp-${lx}`} position={[lx, 10.7, 0.1]}>
+                  <mesh position={[0, 0.1, -0.22]} rotation-x={0.55} castShadow>
+                    <cylinderGeometry args={[0.045, 0.045, 0.6, 8]} />
+                    <meshStandardMaterial {...steel} />
+                  </mesh>
+                  <mesh position={[0, -0.14, 0.16]} rotation-x={0.72} castShadow>
+                    <boxGeometry args={[0.6, 0.16, 0.3]} />
+                    <meshStandardMaterial
+                      ref={(mat) => {
+                        if (mat) lampMats.current[LAMP_X.indexOf(lx)] = mat;
+                      }}
+                      color="#F5F0E8"
+                      emissive="#F5F0E8"
+                      emissiveIntensity={1.1}
+                      toneMapped={false}
+                    />
+                  </mesh>
+                </group>
+              ))}
+
+              {/* editorial label above the board — never covers the artwork */}
+              <Html position={[0, 11.75, 0.3]} center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+                <div
+                  className="whitespace-nowrap rounded-full border px-3 py-1.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.16em] transition-[opacity,transform] duration-300"
+                  style={{
+                    borderColor: "rgba(21,21,21,0.25)",
+                    background: "rgba(245,240,232,0.96)",
+                    color: "#151515",
+                    opacity: hovered ? 1 : 0,
+                    transform: hovered ? "translateY(0)" : "translateY(6px)",
+                  }}
+                >
+                  Outdoor advertising / Brand attention
+                </div>
+              </Html>
+            </group>
           </group>
-        ))}
+        </group>
 
         {/* spot washes: structure + light pools on the pavement */}
         <object3D ref={targetL} position={[-3.5, 3.2, 1.2]} />
@@ -504,26 +656,6 @@ export default function Billboard() {
           </mesh>
         ))}
 
-        {/* editorial label — never covers the artwork */}
-        <Html
-          position={[8.9, 10.75, 0.3]}
-          zIndexRange={[10, 0]}
-          style={{ pointerEvents: "none" }}
-          center={false}
-        >
-          <div
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 font-display text-[0.6rem] font-bold uppercase tracking-[0.16em] transition-opacity duration-500 ${
-              hovered ? "opacity-100" : "opacity-0"
-            }`}
-            style={{
-              borderColor: "rgba(21,21,21,0.25)",
-              background: "rgba(245,240,232,0.94)",
-              color: "#151515",
-            }}
-          >
-            Outdoor advertising / Brand attention
-          </div>
-        </Html>
       </group>
     </group>
   );

@@ -1,12 +1,10 @@
-/** Smooth-scroll to a section id, honouring prefers-reduced-motion. */
+import { motionLevelNow } from "../hooks/useMotionLevel";
+
+/** Scroll to a section id: smooth, or a plain jump in calm motion. */
 export function scrollToSection(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  const reduced =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  el.scrollIntoView({ behavior: motionLevelNow() === "calm" ? "auto" : "smooth", block: "start" });
 }
 
 /** Lock/unlock page scroll (used by overlays and drawers). */

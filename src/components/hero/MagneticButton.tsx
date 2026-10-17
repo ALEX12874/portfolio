@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
+import { motionLevelNow } from "../../hooks/useMotionLevel";
 
 interface MagneticButtonProps {
   children: ReactNode;
@@ -33,7 +34,7 @@ export default function MagneticButton({
   const handleMove = (e: MouseEvent) => {
     const node = ref.current;
     if (!node) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (motionLevelNow() === "calm") return;
     if (window.matchMedia("(pointer: coarse)").matches) return;
     const rect = node.getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);

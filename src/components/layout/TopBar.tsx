@@ -44,7 +44,7 @@ function useSectionAtTop(): Tone {
     };
     measure();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onScroll, { passive: true });
     // a section changed its own tone (project world switch)
     window.addEventListener("section-tone", onScroll);
     return () => {

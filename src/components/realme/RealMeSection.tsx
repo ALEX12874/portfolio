@@ -3,7 +3,7 @@ import { AnimatePresence, m } from "framer-motion";
 import DottedBackground from "../layout/DottedBackground";
 import { sectionHeadings } from "../../data/site";
 import { realMe } from "../../data/realMe";
-import { usePrefersReducedMotion } from "../../hooks/useReducedMotion";
+import { useMotionLevel } from "../../hooks/useMotionLevel";
 import { useReveal } from "../../hooks/useReveal";
 import { buildWeb, type Pt, type WebGeometry } from "./webGeometry";
 import { LEG_ROOTS, PUPIL_BASE, SpiderEngine, type SlotEls } from "./spiderEngine";
@@ -121,7 +121,8 @@ function Cocoon() {
 
 export default function RealMeSection() {
   const heading = sectionHeadings.realMe;
-  const reduced = usePrefersReducedMotion();
+  // calm motion: the scene still plays, just slower and with fewer bugs
+  const calm = useMotionLevel() === "calm";
   const sectionRef = useRef<HTMLElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -134,8 +135,8 @@ export default function RealMeSection() {
   const [touch, setTouch] = useState(false);
   const { ref: revealRef, shown } = useReveal<HTMLDivElement>("0px 0px -20% 0px");
   const { ref: textRef, shown: textShown } = useReveal<HTMLDivElement>();
-  const drawn = reduced || shown;
-  const textOn = reduced || textShown;
+  const drawn = shown;
+  const textOn = textShown;
 
   useEffect(() => setTouch(window.matchMedia("(pointer: coarse)").matches), []);
 
@@ -280,12 +281,6 @@ export default function RealMeSection() {
   }, []);
 
   useEffect(() => {
-    if (reduced) {
-      // reduced motion can resolve after the first render: drop any engine
-      engineRef.current?.destroy();
-      engineRef.current = null;
-      return;
-    }
     if (!web || !spiderRef.current || !threadRef.current) return;
     const els = {
       spider: spiderRef.current,
@@ -296,12 +291,14 @@ export default function RealMeSection() {
       rings: ringRefs.current,
       labels: labelRefs.current,
     };
-    if (!engineRef.current) {
+    if (!engineRef.current || engineRef.current.calm !== calm) {
+      engineRef.current?.destroy();
       const md = layoutRef.current?.mode ?? "desk";
       engineRef.current = new SpiderEngine(web, els, {
-        cap: md === "desk" ? 4 : 3,
+        cap: calm ? 2 : md === "desk" ? 4 : 3,
         size: md === "phone" ? 36 : 50,
-        speed: md === "phone" ? 150 : 220,
+        speed: (md === "phone" ? 150 : 220) * (calm ? 0.5 : 1),
+        calm,
         labels: realMe.bugLabels,
         onSorted: () => setCount((c) => c + 1),
         allow,
@@ -310,7 +307,7 @@ export default function RealMeSection() {
       engineRef.current.setGeometry(web);
     }
     if (visibleRef.current && drawn) engineRef.current.start();
-  }, [web, reduced, allow, drawn]);
+  }, [web, calm, allow, drawn]);
 
   useEffect(() => () => engineRef.current?.destroy(), []);
 
@@ -359,8 +356,8 @@ export default function RealMeSection() {
   const mindset = (
     <m.p
       className="realme-copy relative mt-5 max-w-[34rem] text-[rgba(21,21,21,0.82)] lg:mt-[clamp(0.75rem,2.2vh,1.25rem)]"
-      initial={reduced ? false : { opacity: 0, y: 14 }}
-      animate={textOn ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: calm ? 0 : 14 }}
+      animate={textOn ? { opacity: 1, y: 0 } : { opacity: 0, y: calm ? 0 : 14 }}
       transition={{ duration: 0.7, delay: 0.45, ease: EASE }}
     >
       {realMe.mindset.before}
@@ -369,7 +366,7 @@ export default function RealMeSection() {
         <m.span
           aria-hidden="true"
           className="absolute left-[-3%] right-[-3%] top-[52%] h-[2.5px] origin-left bg-[#E63843]"
-          initial={reduced ? false : { scaleX: 0 }}
+          initial={{ scaleX: 0 }}
           animate={{ scaleX: textOn ? 1 : 0 }}
           transition={{ duration: 0.6, delay: 1.0, ease: EASE }}
         />
@@ -379,7 +376,7 @@ export default function RealMeSection() {
         <m.span
           aria-hidden="true"
           className="absolute inset-x-[-0.12em] bottom-[0.06em] h-[44%] origin-left bg-[#D8FF63]"
-          initial={reduced ? false : { scaleX: 0 }}
+          initial={{ scaleX: 0 }}
           animate={{ scaleX: textOn ? 1 : 0 }}
           transition={{ duration: 0.6, delay: 1.35, ease: EASE }}
         />
@@ -389,25 +386,6 @@ export default function RealMeSection() {
     </m.p>
   );
 
-  // static scene (reduced motion): two finished cocoons
-  const staticCocoons = useMemo(() => {
-    if (!reduced || !web || !layout) return [];
-    const picks: Pt[] = [];
-    const gap = layout.mode === "phone" ? 90 : 140;
-    for (let n = 0; n < web.dirs.length && picks.length < 2; n += 1) {
-      const i = (n * 5 + 1) % web.dirs.length; // spread around the hub
-      for (let k = 3; k < web.radius[i].length; k += 1) {
-        const p = web.point(i, k);
-        if (allow(p) && !picks.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < gap)) {
-          picks.push(p);
-          break;
-        }
-      }
-    }
-    return picks;
-  }, [reduced, web, layout, allow]);
-
-  const spiderHalf = compact ? 18 : 25;
 
   return (
     <section
@@ -426,7 +404,7 @@ export default function RealMeSection() {
       {web ? (
         <svg
           aria-hidden="true"
-          className={`realme-web absolute inset-0 h-full w-full ${drawn ? "is-drawn" : ""} ${reduced ? "is-static" : ""}`}
+          className={`realme-web absolute inset-0 h-full w-full ${drawn ? "is-drawn" : ""}`}
           viewBox={`0 0 ${web.W} ${web.H}`}
           preserveAspectRatio="none"
         >
@@ -486,25 +464,11 @@ export default function RealMeSection() {
           </div>
         ))}
 
-        {staticCocoons.map((p, n) => (
-          <div
-            key={`static-${n}`}
-            className="web-bug is-on is-wrap is-sorted is-static"
-            style={{ transform: `translate(${p.x}px, ${p.y}px)` }}
-          >
-            <Cocoon />
-            <span className="web-bug__tag">Sorted ✓</span>
-          </div>
-        ))}
 
         <div
           ref={spiderRef}
           className={`web-spider ${compact ? "web-spider--sm" : ""}`}
-          style={
-            reduced && web
-              ? { transform: `translate(${web.hub.x - spiderHalf}px, ${web.hub.y - spiderHalf}px)` }
-              : { transform: "translate(-200px, -200px)" }
-          }
+          style={{ transform: "translate(-200px, -200px)" }}
         >
           <svg viewBox="-24 -24 48 48" className="h-full w-full overflow-visible">
             {LEG_ROOTS.map((_, n) => (
@@ -559,7 +523,7 @@ export default function RealMeSection() {
       {/* ---- copy + composition ---- */}
       <div
         ref={revealRef}
-        className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-col px-5 pb-6 pt-24 sm:px-8 lg:min-h-[min(calc(100svh-72px),900px)] lg:px-12 lg:pb-[clamp(1rem,2.6vh,1.75rem)] lg:pt-[clamp(1.5rem,4.5vh,3rem)]"
+        className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-col px-5 pb-5 pt-[4.5rem] sm:px-8 sm:pb-6 sm:pt-24 lg:min-h-[min(calc(100svh-72px),900px)] lg:px-12 lg:pb-[clamp(1rem,2.6vh,1.75rem)] lg:pt-[clamp(1.5rem,4.5vh,3rem)]"
       >
         <div className="flex-1 lg:grid lg:grid-cols-[minmax(0,42fr)_minmax(0,58fr)] lg:items-center xl:grid-cols-[minmax(0,40fr)_minmax(0,60fr)]">
           <div ref={textRef} data-text className="realme-text relative max-w-[36rem] lg:max-w-none lg:pr-6">
@@ -569,8 +533,8 @@ export default function RealMeSection() {
                 <span key={line} className="block overflow-hidden pb-[0.05em]" aria-hidden="true">
                   <m.span
                     className="block"
-                    initial={reduced ? false : { y: "105%" }}
-                    animate={textOn ? { y: "0%" } : { y: "105%" }}
+                    initial={calm ? { opacity: 0 } : { y: "105%" }}
+                    animate={textOn ? { y: "0%", opacity: 1 } : calm ? { opacity: 0 } : { y: "105%" }}
                     transition={{ duration: 0.7, delay: i * 0.06, ease: EASE }}
                   >
                     {line}
@@ -580,8 +544,8 @@ export default function RealMeSection() {
             </h2>
             <m.p
               className="realme-copy relative mt-5 max-w-[34rem] text-[rgba(21,21,21,0.82)] lg:mt-[clamp(0.75rem,2.2vh,1.25rem)]"
-              initial={reduced ? false : { opacity: 0, y: 14 }}
-              animate={textOn ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: calm ? 0 : 14 }}
+              animate={textOn ? { opacity: 1, y: 0 } : { opacity: 0, y: calm ? 0 : 14 }}
               transition={{ duration: 0.7, delay: 0.3, ease: EASE }}
             >
               {heading.copy}
@@ -594,7 +558,7 @@ export default function RealMeSection() {
         {!desk ? (
           <div
             ref={areaRef}
-            className={`relative my-4 w-full ${mode === "tab" ? "h-[60vw] max-h-[560px]" : "h-[86vw]"}`}
+            className={`relative my-4 w-full ${mode === "tab" ? "h-[60vw] max-h-[560px]" : "h-[80vw]"}`}
           />
         ) : null}
         {!desk ? (
@@ -622,22 +586,20 @@ export default function RealMeSection() {
               <span className="relative inline-flex h-[1.2em] min-w-[2ch] overflow-hidden align-bottom font-black tabular-nums text-[#C42530]">
                 <AnimatePresence initial={false} mode="popLayout">
                   <m.span
-                    key={reduced ? "static" : count}
+                    key={count}
                     initial={{ y: "100%", opacity: 0 }}
                     animate={{ y: "0%", opacity: 1 }}
                     exit={{ y: "-100%", opacity: 0 }}
                     transition={{ duration: 0.35, ease: EASE }}
                   >
-                    {String(reduced ? staticCocoons.length : count).padStart(2, "0")}
+                    {String(count).padStart(2, "0")}
                   </m.span>
                 </AnimatePresence>
               </span>
             </p>
-            {!reduced ? (
-              <p className="mt-1 text-[0.82rem] text-[rgba(21,21,21,0.66)]">
-                {touch ? realMe.hint.touch : realMe.hint.pointer}
-              </p>
-            ) : null}
+            <p className="mt-1 text-[0.82rem] text-[rgba(21,21,21,0.66)]">
+              {touch ? realMe.hint.touch : realMe.hint.pointer}
+            </p>
           </div>
         </div>
       </div>

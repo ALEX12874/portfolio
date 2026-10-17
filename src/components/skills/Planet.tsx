@@ -11,6 +11,8 @@ interface PlanetProps {
   selected: boolean;
   hovered: boolean;
   animate: boolean;
+  /** Orbit speed multiplier (calm motion orbits at half speed). */
+  pace?: number;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
 }
@@ -36,6 +38,7 @@ export default function Planet({
   selected,
   hovered,
   animate,
+  pace = 1,
   onHover,
   onSelect,
 }: PlanetProps) {
@@ -56,7 +59,7 @@ export default function Planet({
     const t = clock.getElapsedTime();
     if (born.current < 0) born.current = t;
 
-    const a = layout.phase + (animate ? t * layout.orbitSpeed : 0);
+    const a = layout.phase + (animate ? t * layout.orbitSpeed * pace : 0);
     const r = layout.orbitRadius;
     const incl = layout.inclination;
 

@@ -38,13 +38,13 @@ export default function Footer() {
       <DottedBackground tone="ink" />
       <div className="absolute inset-x-0 top-0 h-px bg-[rgba(245,240,232,0.18)]" aria-hidden="true" />
 
-      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pt-24 lg:px-12 lg:pt-32">
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-12 sm:px-8 sm:pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-24 lg:px-12 lg:pt-32">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-16 xl:gap-24">
           {/* ---- details ---- */}
           <div>
             <p className="eyebrow text-[#E63843]">GET IN TOUCH</p>
 
-            <h2 id="contact-heading" className="display mt-6 text-[clamp(3rem,15vw,6rem)] leading-[0.9] lg:text-[min(6.4vw,6.6rem)]">
+            <h2 id="contact-heading" className="display mt-6 text-[clamp(2.65rem,13.2vw,5.3rem)] leading-[0.9] sm:text-[clamp(3rem,15vw,6rem)] lg:text-[min(6.4vw,6.6rem)]">
               <span className="block">{site.firstName}</span>
               <span className="block text-[#E63843]">{site.lastName}</span>
             </h2>

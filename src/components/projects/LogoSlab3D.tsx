@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { usePrefersReducedMotion } from "../../hooks/useReducedMotion";
+import { useMotionLevel } from "../../hooks/useMotionLevel";
 
 interface LogoSlab3DProps {
   src: string;
@@ -23,14 +23,14 @@ const MAX_TILT = 8; // degrees
  * - Bevel: light top-left edge, darker bottom-right edge, inner shadow where
  *   the bezel meets the artwork, and a soft floor shadow.
  * - Motion: slow float (±6px / 6s), damped pointer-parallax tilt (≤ 8°,
- *   smooth return), faint light sweep across the bevel. Reduced motion:
- *   static.
+ *   smooth return), faint light sweep across the bevel. Calm motion: the
+ *   float and sweep slow down (CSS) and the pointer tilt is off.
  *
  * Size it from the parent via the `--slab` custom property or the default
  * container-query sizing in `.logo-slab`.
  */
 export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps) {
-  const reduced = usePrefersReducedMotion();
+  const calm = useMotionLevel() === "calm";
   const wrap = useRef<HTMLDivElement | null>(null);
   const tilt = useRef<HTMLDivElement | null>(null);
 
@@ -39,7 +39,7 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
     const body = tilt.current;
     if (!node || !body) return;
     body.style.transform = "rotateX(0deg) rotateY(0deg)";
-    if (reduced || window.matchMedia("(pointer: coarse)").matches) return;
+    if (calm || window.matchMedia("(pointer: coarse)").matches) return;
 
     // pointer anywhere on the stage steers the slab
     const stage = node.parentElement ?? node;
@@ -75,17 +75,17 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
       kick();
     };
 
-    stage.addEventListener("pointermove", onMove);
+    stage.addEventListener("pointermove", onMove, { passive: true });
     stage.addEventListener("pointerleave", onLeave);
     return () => {
       stage.removeEventListener("pointermove", onMove);
       stage.removeEventListener("pointerleave", onLeave);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [reduced]);
+  }, [calm]);
 
   return (
-    <div ref={wrap} className={`logo-slab ${reduced ? "logo-slab--static" : ""}`}>
+    <div ref={wrap} className="logo-slab">
       {/* soft floor shadow (breathes opposite to the float) */}
       <div className="logo-slab__floor" aria-hidden="true" />
 
