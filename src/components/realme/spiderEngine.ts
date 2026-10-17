@@ -257,12 +257,19 @@ export class SpiderEngine {
   private spawnRandom() {
     const g = this.geo;
     const ringCount = g.radius[0].length;
-    for (let tries = 0; tries < 50; tries += 1) {
-      const i = Math.floor(Math.random() * SPOKES);
-      const k = 3 + Math.floor(Math.random() * Math.max(1, ringCount - 4));
-      const p = g.point(i, k);
-      if (!this.opts.allow(p)) continue;
-      if (this.bugs.some((b) => Math.hypot(b.to.x - p.x, b.to.y - p.y) < 70)) continue;
+    // pick among the crossings that are actually allowed (on phones most
+    // rings run far outside the small web area, so random tries would miss)
+    const spots: { i: number; k: number }[] = [];
+    for (let i = 0; i < SPOKES; i += 1) {
+      for (let k = 3; k < ringCount; k += 1) {
+        const p = g.point(i, k);
+        if (!this.opts.allow(p)) continue;
+        if (this.bugs.some((b) => Math.hypot(b.to.x - p.x, b.to.y - p.y) < 70)) continue;
+        spots.push({ i, k });
+      }
+    }
+    if (spots.length) {
+      const { i, k } = spots[Math.floor(Math.random() * spots.length)];
       // enter from a random edge
       const edge = Math.floor(Math.random() * 4);
       const from =
@@ -274,7 +281,6 @@ export class SpiderEngine {
               ? { x: Math.random() * g.W, y: g.H + 30 }
               : { x: -30, y: Math.random() * g.H };
       this.spawn(from, i, k);
-      return;
     }
   }
 

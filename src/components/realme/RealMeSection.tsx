@@ -266,8 +266,9 @@ export default function RealMeSection() {
   const allow = useCallback((p: Pt) => {
     const l = layoutRef.current;
     if (!l) return false;
-    if (Math.hypot(p.x - l.hub.x, p.y - l.hub.y) < 60) return false;
-    if (nodesRef.current.some((n) => Math.hypot(n.x - p.x, n.y - p.y) < 70)) return false;
+    const phone = l.mode === "phone";
+    if (Math.hypot(p.x - l.hub.x, p.y - l.hub.y) < (phone ? 40 : 60)) return false;
+    if (nodesRef.current.some((n) => Math.hypot(n.x - p.x, n.y - p.y) < (phone ? 44 : 70))) return false;
     // a stuck bug carries a label pill above it: keep both clear of the cards
     // (phones have little room, so there only the bug itself stays clear)
     const bug = l.mode === "phone" ? { x: p.x - 16, y: p.y - 16, w: 32, h: 32 } : { x: p.x - 70, y: p.y - 44, w: 140, h: 60 };
@@ -277,7 +278,9 @@ export default function RealMeSection() {
     }
     const a = l.area;
     if (!a) return false;
-    return p.x > a.x + 24 && p.x < a.x + a.w - 24 && p.y > a.y + 16 && p.y < a.y + a.h - 16;
+    const mx = phone ? 14 : 24;
+    const my = phone ? 10 : 16;
+    return p.x > a.x + mx && p.x < a.x + a.w - mx && p.y > a.y + my && p.y < a.y + a.h - my;
   }, []);
 
   useEffect(() => {

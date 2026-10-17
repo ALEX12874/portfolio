@@ -133,3 +133,18 @@ test.describe("phone", () => {
     expect(problems, problems.join("\n")).toEqual([]);
   });
 });
+
+test.describe("small phone", () => {
+  test.use({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+
+  test("the spider still finds room on the narrowest phones", async ({ page }) => {
+    const problems = watch(page);
+    await page.goto("/");
+    await page.waitForLoadState("load");
+    await tour(page);
+    await spiderSorts(page);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBe(0);
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+});
