@@ -59,6 +59,22 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
   const anim = useRef({ s: { x: 1, v: 0 } as Spring, raf: 0, last: 0 });
   const tapTimer = useRef(0);
   const hot = heroHotspot[variant];
+  // the artwork is fetched only after the page has loaded (or on the first
+  // interaction), so it never competes with the poster / fonts (LCP)
+  const [art, setArt] = useState(false);
+  useEffect(() => {
+    if (art) return undefined;
+    let t = 0;
+    const later = () => {
+      t = window.setTimeout(() => setArt(true), 1200);
+    };
+    if (document.readyState === "complete") later();
+    else window.addEventListener("load", later, { once: true });
+    return () => {
+      window.removeEventListener("load", later);
+      window.clearTimeout(t);
+    };
+  }, [art]);
 
   // track the stage size (the video box)
   useLayoutEffect(() => {
@@ -137,6 +153,7 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
   useEffect(() => () => window.clearTimeout(tapTimer.current), []);
 
   const tap = () => {
+    setArt(true);
     setTapped(true);
     setOn(true);
     window.clearTimeout(tapTimer.current);
@@ -170,7 +187,7 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
           <span className="hero-pop__led hero-pop__led--bottom" />
           <span className="hero-pop__led hero-pop__led--left" />
           <span className="hero-pop__led hero-pop__led--right" />
-          <div className="hero-pop__art" style={{ backgroundImage: `url(${assets.billboard})` }} />
+          <div className="hero-pop__art" style={art ? { backgroundImage: `url(${assets.billboard})` } : undefined} />
         </div>
       </div>
 
@@ -195,6 +212,7 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
           className="hero-hotspot pointer-events-auto absolute"
           style={{ left, top, width, height }}
           onPointerEnter={(e) => {
+            setArt(true);
             if (e.pointerType === "mouse" || e.pointerType === "pen") setOn(true);
           }}
           onPointerLeave={(e) => {
@@ -203,7 +221,10 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
           onPointerUp={(e) => {
             if (e.pointerType === "touch") tap();
           }}
-          onFocus={() => setOn(true)}
+          onFocus={() => {
+            setArt(true);
+            setOn(true);
+          }}
           onBlur={() => setOn(false)}
           onClick={(e) => {
             // keyboard Enter/Space (detail 0) gives the tap bounce too

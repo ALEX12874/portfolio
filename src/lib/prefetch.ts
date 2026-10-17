@@ -1,4 +1,4 @@
-import { projects } from "../data/projects";
+import { assets } from "../data/assets";
 
 type IdleWindow = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
@@ -33,8 +33,9 @@ export function decodeImage(src: string): Promise<void> {
 
 /** The four project logos, decoded ahead so project switches never blank. */
 export function preloadProjectLogos(): void {
-  projects.forEach((p) => {
-    if (p.logo) void decodeImage(p.logo);
+  // straight from the asset map, so the project data stays in its own chunk
+  [assets.logoDipNSip, assets.logoWrepd, assets.logoSynkk, assets.logoInayat].forEach((src) => {
+    if (src) void decodeImage(src);
   });
 }
 
