@@ -60,9 +60,9 @@ export const sectionHeadings = {
   },
   realMe: {
     eyebrow: "05 / THE REAL ME",
-    title: "RAISED BY A FAMILY BUSINESS. TRAINED BY A JOINT FAMILY.",
+    title: "SCHOOLED IN BUSINESS. NOT IN CLASSROOMS.",
     /** Display line breaks for the line-by-line reveal (joined = title). */
-    titleLines: ["RAISED BY A", "FAMILY BUSINESS.", "TRAINED BY A", "JOINT FAMILY."],
+    titleLines: ["SCHOOLED IN", "BUSINESS.", "NOT IN", "CLASSROOMS."],
     copy: "Before the projects and internships, there was the family business, and I'm the only son in a joint family. Translation: when something needs sorting, every eye in the house turns to me. That's where I learned how business really works: reading customers, untangling problems, and making calls that actually count.",
   },
   perspectives: {
