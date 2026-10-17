@@ -8,11 +8,12 @@ import DeferredSection from "./components/layout/DeferredSection";
 // below the fold: separate chunks, rendered right after first paint
 const ProjectsSection = lazy(() => import("./components/projects/ProjectsSection"));
 const ExperienceSection = lazy(() => import("./components/experience/ExperienceSection"));
+const RealMeSection = lazy(() => import("./components/realme/RealMeSection"));
 const PerspectivesSection = lazy(() => import("./components/perspectives/PerspectivesSection"));
 const Footer = lazy(() => import("./components/layout/Footer"));
 
 /**
- * Single-page portfolio: five sections + footer.
+ * Single-page portfolio: six sections + footer.
  */
 export default function App() {
   return (
@@ -36,6 +37,10 @@ export default function App() {
 
         <DeferredSection id="experience" tone="#151515">
           <ExperienceSection />
+        </DeferredSection>
+
+        <DeferredSection id="real-me" tone="#EFE8DC">
+          <RealMeSection />
         </DeferredSection>
 
         <DeferredSection id="perspectives" tone="#F5F0E8">

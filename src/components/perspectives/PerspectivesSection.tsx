@@ -5,7 +5,7 @@ import { testimonials } from "../../data/testimonials";
 import { sectionHeadings } from "../../data/site";
 
 /**
- * 05 / PEOPLE & PERSPECTIVES — staggered editorial grid on ivory.
+ * 06 / PEOPLE & PERSPECTIVES — staggered editorial grid on ivory.
  * Six verbatim quotes, each with its own LinkedIn mapping.
  */
 export default function PerspectivesSection() {

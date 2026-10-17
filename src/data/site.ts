@@ -36,6 +36,7 @@ export const sections: SectionLink[] = [
   { id: "capabilities", label: "Capabilities" },
   { id: "projects", label: "Projects" },
   { id: "experience", label: "Experience" },
+  { id: "real-me", label: "The Real Me" },
   { id: "perspectives", label: "Perspectives" },
   { id: "contact", label: "Contact" },
 ];
@@ -57,8 +58,15 @@ export const sectionHeadings = {
     title: "WHERE IDEAS MET THE REAL WORLD.",
     copy: "From learning how marketing works inside a business to understanding how brands connect with people, every experience has added another layer to the way I think.",
   },
+  realMe: {
+    eyebrow: "05 / THE REAL ME",
+    title: "BEFORE THE INTERNSHIPS, THERE WAS THE FAMILY BUSINESS.",
+    /** Display line breaks for the line-by-line reveal (joined = title). */
+    titleLines: ["BEFORE THE", "INTERNSHIPS,", "THERE WAS", "THE FAMILY", "BUSINESS."],
+    copy: "I'm more than my projects and internships. I grew up in a family business, as the only son in a joint family. Long before any classroom, I was learning how a business actually runs: reading what customers want, solving problems as they come up, and making decisions that carry real weight.",
+  },
   perspectives: {
-    eyebrow: "05 / PEOPLE & PERSPECTIVES",
+    eyebrow: "06 / PEOPLE & PERSPECTIVES",
     title: "GOOD WORK LEAVES A GOOD IMPRESSION.",
     copy: "Some of the best things I've learned about marketing came from building ideas with other people. Here's what a few of those collaborations looked like from their side.",
   },
