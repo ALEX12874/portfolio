@@ -99,7 +99,8 @@ function SceneStage() {
       {useLive ? (
         <div
           className="absolute inset-0"
-          style={{ opacity: live ? 1 : 0, transition: `opacity ${FADE_MS}ms ease` }}
+          // invisible while warming up: let the poster's hotspot get the pointer
+          style={{ opacity: live ? 1 : 0, pointerEvents: live ? "auto" : "none", transition: `opacity ${FADE_MS}ms ease` }}
         >
           <SceneErrorBoundary fallback={null} onError={onFallback}>
             <Suspense fallback={null}>
@@ -109,6 +110,7 @@ function SceneStage() {
                 parallax={!touch.current}
                 onLowFps={onFallback}
                 onReady={onReady}
+                interactive={live}
               />
             </Suspense>
           </SceneErrorBoundary>

@@ -82,7 +82,12 @@ test.describe("desktop", () => {
 
     // billboard pop on hover: live 3D board or the video hotspot
     const stage = page.locator("[data-hero-stage]");
-    await page.waitForTimeout(1500);
+    // desktop runs live 3D unless the device is too slow: give the scene up
+    // to 20 s to warm up and take over, otherwise test the video hotspot
+    await expect
+      .poll(() => stage.getAttribute("data-hero-mode"), { timeout: 20_000 })
+      .toBe("live")
+      .catch(() => undefined);
     const mode = await stage.getAttribute("data-hero-mode");
     if (mode === "live") {
       const canvas = stage.locator("canvas");
@@ -116,6 +121,18 @@ test.describe("phone", () => {
 
   test("tour, spider, billboard tap", async ({ page }) => {
     const problems = watch(page);
+    // record every pop/settle with the page's own clock, so the hold time is
+    // measured exactly even when the test machine is busy
+    await page.addInitScript(() => {
+      const w = window as unknown as { __pops: [string, number][] };
+      w.__pops = [];
+      new MutationObserver((list) =>
+        list.forEach((m) => {
+          const v = (m.target as Element).getAttribute("data-popped");
+          if (v) w.__pops.push([v, performance.now()]);
+        })
+      ).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-popped"] });
+    });
     await page.goto("/");
     await page.waitForLoadState("load");
 
@@ -123,8 +140,13 @@ test.describe("phone", () => {
     await hotspot.scrollIntoViewIfNeeded();
     await hotspot.tap();
     await expect(hotspot).toHaveAttribute("data-popped", "1");
-    // auto-settles after 1.6 s
-    await expect(hotspot).toHaveAttribute("data-popped", "0", { timeout: 4000 });
+    await expect(hotspot).toHaveAttribute("data-popped", "0", { timeout: 15_000 });
+    // a tap pops the board and it settles by itself after ~1.6 s
+    const pops = await page.evaluate(() => (window as unknown as { __pops: [string, number][] }).__pops);
+    const up = pops.find(([v]) => v === "1")?.[1] ?? NaN;
+    const down = pops.find(([v, t]) => v === "0" && t > up)?.[1] ?? NaN;
+    expect(down - up).toBeGreaterThan(1400);
+    expect(down - up).toBeLessThan(2600);
 
     await tour(page);
     await projectsAndExperience(page);

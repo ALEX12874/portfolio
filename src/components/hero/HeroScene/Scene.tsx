@@ -26,6 +26,8 @@ interface SceneProps {
   onLowFps?: () => void;
   /** Called once shaders are compiled and the first frames are on screen. */
   onReady?: () => void;
+  /** Pointer events reach the scene (off while it warms up invisibly). */
+  interactive?: boolean;
 }
 
 interface Quality {
@@ -191,7 +193,7 @@ const CARS = [
  * - Fog: 52 → 115, so the near ink skyline keeps its colour and only the far
  *   row dissolves into the page.
  */
-export default function Scene({ active, parallax, tier = "high", onLowFps, onReady }: SceneProps) {
+export default function Scene({ active, parallax, tier = "high", onLowFps, onReady, interactive = true }: SceneProps) {
   const framing = CAPTURE ? captureFraming() : LIVE;
   const [quality, setQuality] = useState<Quality>(() => (CAPTURE ? QUALITY.high : QUALITY[tier]));
   const qualityRef = useRef(quality);
@@ -214,6 +216,8 @@ export default function Scene({ active, parallax, tier = "high", onLowFps, onRea
   return (
     <Canvas
       shadows
+      // R3F sets pointer-events on its own wrapper, so the switch lives here
+      style={{ pointerEvents: interactive ? "auto" : "none" }}
       dpr={CAPTURE ? 1 : [1, quality.dpr]}
       frameloop={CAPTURE ? "never" : active ? "always" : "never"}
       gl={{

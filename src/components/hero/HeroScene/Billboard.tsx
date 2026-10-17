@@ -123,6 +123,9 @@ function makeLedTexture(): THREE.CanvasTexture {
  */
 const tmpCenter = new THREE.Vector3();
 
+/** Real hover (mouse/trackpad). Touch screens fake a sticky hover after a tap. */
+const canHover = () => typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches;
+
 export default function Billboard() {
   const { gl, camera } = useThree();
 
@@ -304,10 +307,10 @@ export default function Billboard() {
           position={[0, FACE_CY + 0.3, 0.25]}
           onPointerOver={(e) => {
             e.stopPropagation();
-            if (e.pointerType !== "touch") setHovered(true);
+            if (e.pointerType !== "touch" && canHover()) setHovered(true);
           }}
           onPointerOut={(e) => {
-            if (e.pointerType !== "touch") setHovered(false);
+            if (e.pointerType !== "touch" && canHover()) setHovered(false);
           }}
           onPointerMove={(e) => {
             if (!hit.current) return;

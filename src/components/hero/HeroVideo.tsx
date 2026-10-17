@@ -17,9 +17,6 @@ const SOURCES = {
 type Variant = keyof typeof SOURCES;
 type Fit = "contain" | "cover";
 
-/** React 18 only forwards the lowercase HTML attribute without warning. */
-const HIGH_PRIORITY = { fetchpriority: "high" } as Record<string, string>;
-
 /** Phone composition below 900px or in portrait; wide otherwise. */
 function pickVariant(): Variant {
   if (typeof window === "undefined") return "wide";
@@ -58,6 +55,30 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
   const [tapped, setTapped] = useState(false);
   const anim = useRef({ s: { x: 1, v: 0 } as Spring, raf: 0, last: 0 });
   const tapTimer = useRef(0);
+  // what the visitor used last: focus only pops the board for keyboard users
+  // (a tap focuses the button too, and the tap's own timer must settle it)
+  const lastInput = useRef<"key" | "pointer">("pointer");
+  // touch browsers fire a synthetic "mouse" hover after a tap (iOS sticky
+  // hover) that never leaves again: hover only counts on real hover devices,
+  // and never right after a touch
+  const lastTouch = useRef(-Infinity);
+  const canHover = useRef(true);
+  useEffect(() => {
+    canHover.current = window.matchMedia("(hover: hover)").matches;
+    const onKey = () => {
+      lastInput.current = "key";
+    };
+    const onPointer = (e: PointerEvent) => {
+      lastInput.current = "pointer";
+      if (e.pointerType === "touch") lastTouch.current = performance.now();
+    };
+    window.addEventListener("keydown", onKey, { capture: true, passive: true });
+    window.addEventListener("pointerdown", onPointer, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("keydown", onKey, { capture: true });
+      window.removeEventListener("pointerdown", onPointer, { capture: true });
+    };
+  }, []);
   const hot = heroHotspot[variant];
   // the artwork is fetched only after the page has loaded (or on the first
   // interaction), so it never competes with the poster / fonts (LCP)
@@ -217,27 +238,24 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
           style={{ left, top, width, height }}
           onPointerEnter={(e) => {
             setArt(true);
-            if (e.pointerType === "mouse" || e.pointerType === "pen") setOn(true);
+            if (e.pointerType === "touch") return;
+            if (!canHover.current || performance.now() - lastTouch.current < 1000) return;
+            setOn(true);
           }}
           onPointerLeave={(e) => {
-            if (e.pointerType === "mouse" || e.pointerType === "pen") setOn(false);
+            if (e.pointerType === "touch" || !canHover.current) return;
+            setOn(false);
           }}
           onPointerUp={(e) => {
             if (e.pointerType === "touch") tap();
           }}
-          onFocus={(e) => {
+          onFocus={() => {
             setArt(true);
-            // keyboard focus only: a tap also focuses the button, and the
-            // tap's own 1.6 s timer must stay in charge of settling
-            let keyboard = true;
-            try {
-              keyboard = e.currentTarget.matches(":focus-visible");
-            } catch {
-              keyboard = true;
-            }
-            if (keyboard) setOn(true);
+            if (lastInput.current === "key") setOn(true);
           }}
-          onBlur={() => setOn(false)}
+          onBlur={() => {
+            if (lastInput.current === "key") setOn(false);
+          }}
           onClick={(e) => {
             // keyboard Enter/Space (detail 0) gives the tap bounce too
             if (e.detail === 0) tap();
@@ -250,18 +268,27 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
 
 /* ------------------------------------------------------------- video */
 
+/** The poster is this frame of the loop (scripts/render-hero.mjs POSTER_T). */
+const POSTER_T = 3;
+const ALT = "3D street scene: a large billboard reading IT'S ALL MARKETING. above a crowd and passing cars";
+
 /**
  * Pre-rendered loop of the live 3D hero (scripts/render-hero.mjs), so every
- * device gets the same scene. The poster is a real frame of that scene and
- * paints first (LCP); the video fades in only once it actually plays, so
- * blocked autoplay (iOS Low Power Mode) still shows the poster. Pauses
- * off-screen. Calm motion still plays the (slow, camera-still) loop.
+ * device gets the same scene.
+ *
+ * One <video> element does both jobs: its poster (a real frame of the loop,
+ * preloaded from index.html) is the first paint and the page's LCP, and the
+ * same element later plays the loop. Because playback starts in the element
+ * that is already the LCP, it never registers as a new, later LCP. The video
+ * bytes are attached only after the page has loaded; playback starts on the
+ * poster frame, so the hand-over is seamless. Blocked autoplay (iOS Low
+ * Power Mode) simply keeps the poster. Pauses off-screen. Calm motion still
+ * plays the (slow, camera-still) loop.
  *
  * `still`: poster only (used while the live 3D scene warms up on top).
  */
 export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fit; still?: boolean }) {
   const [variant, setVariant] = useState<Variant>(pickVariant);
-  const [playing, setPlaying] = useState(false);
   // attach the video only after the page has loaded, so its bytes never
   // compete with the poster (LCP) or the app's own scripts
   const [attach, setAttach] = useState(false);
@@ -278,8 +305,6 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
       window.removeEventListener("orientationchange", onResize);
     };
   }, []);
-
-  useEffect(() => setPlaying(false), [variant]);
 
   useEffect(() => {
     let t = 0;
@@ -299,6 +324,12 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
     const v = video.current;
     const node = wrap.current;
     if (!v || !node || still || !attach) return undefined;
+
+    // start on the poster frame, so poster → moving video is seamless
+    const toPosterFrame = () => {
+      if (v.currentTime < 0.05 && v.duration > POSTER_T) v.currentTime = POSTER_T;
+    };
+    v.addEventListener("loadedmetadata", toPosterFrame, { once: true });
 
     let visible = true;
     const tryPlay = () => {
@@ -326,6 +357,7 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
 
     return () => {
       io?.disconnect();
+      v.removeEventListener("loadedmetadata", toPosterFrame);
       gestures.forEach((g) => window.removeEventListener(g, onGesture));
     };
   }, [variant, still, attach]);
@@ -335,39 +367,32 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
 
   return (
     <div ref={wrap} className="relative h-full w-full" style={{ background: "#F5F0E8" }}>
-      <img
-        src={src.poster}
-        alt="3D street scene: a large billboard reading IT'S ALL MARKETING. above a crowd and passing cars"
-        width={src.width}
-        height={src.height}
-        // the poster is the hero's largest paint
-        {...HIGH_PRIORITY}
-        decoding="async"
+      <video
+        key={variant}
+        ref={video}
         className={media}
         style={{ objectPosition: "center bottom" }}
-        draggable={false}
-      />
-      {still || !attach ? null : (
-        <video
-          key={variant}
-          ref={video}
-          className={`${media} transition-opacity duration-500`}
-          style={{ objectPosition: "center bottom", opacity: playing ? 1 : 0 }}
-          muted
-          loop
-          playsInline
-          autoPlay
-          preload="metadata"
-          poster={src.poster}
-          disablePictureInPicture
-          aria-hidden="true"
-          tabIndex={-1}
-          onPlaying={() => setPlaying(true)}
-        >
-          <source src={src.webm} type="video/webm" />
-          <source src={src.mp4} type="video/mp4" />
-        </video>
-      )}
+        width={src.width}
+        height={src.height}
+        muted
+        loop
+        playsInline
+        // nothing but the poster until the page has loaded
+        preload="none"
+        poster={src.poster}
+        disablePictureInPicture
+        // the poster is real content: describe it (the hotspot sits beside it)
+        role="img"
+        aria-label={ALT}
+        tabIndex={-1}
+      >
+        {still || !attach ? null : (
+          <>
+            <source src={src.webm} type="video/webm" />
+            <source src={src.mp4} type="video/mp4" />
+          </>
+        )}
+      </video>
       <BillboardPop key={variant} variant={variant} fit={fit} />
     </div>
   );
