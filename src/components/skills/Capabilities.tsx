@@ -8,6 +8,9 @@ import { sectionHeadings } from "../../data/site";
 import { useNearViewport } from "../../hooks/useInView";
 import { useSceneTurn } from "../../lib/sceneArbiter";
 
+const NEAR_MARGIN =
+  typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? "150px" : "600px";
+
 // 3D is lazy-loaded so three.js stays out of the first paint
 const SolarSystem = lazy(() => import("./SolarSystem"));
 
@@ -22,8 +25,10 @@ export default function Capabilities() {
   // one WebGL scene at a time: the orbit renders only while it is the most
   // visible 3D scene (the live hero pauses meanwhile, and vice versa)
   const { ref, active } = useSceneTurn<HTMLElement>("solar");
-  // three.js is only fetched once the section is ~600px from the viewport
-  const { ref: nearRef, near } = useNearViewport<HTMLDivElement>("600px");
+  // three.js is only fetched once the orbit is close: ~600px ahead on
+  // desktop, ~150px on phones (where the hero is short, 600px would start
+  // the heavy 3D parse while the page is still loading)
+  const { ref: nearRef, near } = useNearViewport<HTMLDivElement>(NEAR_MARGIN);
   const copy = sectionHeadings.capabilities;
 
   // Esc clears the selection
