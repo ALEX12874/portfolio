@@ -60,10 +60,10 @@ export const sectionHeadings = {
   },
   realMe: {
     eyebrow: "05 / THE REAL ME",
-    title: "BEFORE THE INTERNSHIPS, THERE WAS THE FAMILY BUSINESS.",
+    title: "RAISED BY A FAMILY BUSINESS. TRAINED BY A JOINT FAMILY.",
     /** Display line breaks for the line-by-line reveal (joined = title). */
-    titleLines: ["BEFORE THE", "INTERNSHIPS,", "THERE WAS", "THE FAMILY", "BUSINESS."],
-    copy: "I'm more than my projects and internships. I grew up in a family business, as the only son in a joint family. Long before any classroom, I was learning how a business actually runs: reading what customers want, solving problems as they come up, and making decisions that carry real weight.",
+    titleLines: ["RAISED BY A", "FAMILY BUSINESS.", "TRAINED BY A", "JOINT FAMILY."],
+    copy: "Before the projects and internships, there was the family business, and I'm the only son in a joint family. Translation: when something needs sorting, every eye in the house turns to me. That's where I learned how business really works: reading customers, untangling problems, and making calls that actually count.",
   },
   perspectives: {
     eyebrow: "06 / PEOPLE & PERSPECTIVES",

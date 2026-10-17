@@ -1,8 +1,8 @@
 /**
- * 05 / THE REAL ME — copy for the "family ledger" section.
+ * 05 / THE REAL ME — the spider-web scene.
  * Components only read from here (and sectionHeadings.realMe in site.ts).
  */
-export interface HeritageSkill {
+export interface WebSkill {
   id: string;
   number: string;
   title: string;
@@ -10,49 +10,50 @@ export interface HeritageSkill {
 }
 
 export const realMe = {
-  skillsHeading: "WHAT I BRING FROM MY HERITAGE",
-  skillsLine: "Alongside my marketing skills, these come with me from home.",
-  /** Embossed label on the ledger cover. */
-  ledgerLabel: "GOURANG — LEDGER",
   skills: [
-    {
-      id: "market-analysis",
-      number: "01",
-      title: "Market Analysis",
-      line: "Reading what the market wants and how it shifts, through everyday business.",
-    },
+    { id: "market-analysis", number: "01", title: "Market Analysis", line: "Reading the market before it reads me." },
     {
       id: "consumer-psychology",
       number: "02",
       title: "Consumer Psychology",
-      line: "Understanding customer preferences: what makes people choose, return and trust.",
+      line: "Decoding 'just looking' and what makes people come back.",
     },
-    {
-      id: "problem-solving",
-      number: "03",
-      title: "Problem Solving",
-      line: "Fixing real business problems as they come, with whatever is at hand.",
-    },
-    {
-      id: "decision-making",
-      number: "04",
-      title: "Decision Making",
-      line: "Taking calls that have real consequences, and owning them.",
-    },
+    { id: "problem-solving", number: "03", title: "Problem Solving", line: "Problems land in my web. They don't leave unsolved." },
+    { id: "decision-making", number: "04", title: "Decision Making", line: "Making the call and owning it. No committee required." },
     {
       id: "creative-mindset",
       number: "05",
       title: "Creative Mindset",
-      line: "Finding another way when the usual one doesn't work.",
+      line: "When Plan A fails, the alphabet has 25 more letters.",
     },
-  ] as HeritageSkill[],
+  ] as WebSkill[],
+  /**
+   * Mindset paragraph, split around the two marked phrases:
+   * I never asked "Why only me?" I asked "What's next?" Responsibility …
+   */
   mindset: {
-    eyebrow: "BEYOND THE CV",
-    /** The question I never ask — set in display type with a strike line. */
-    question: '"Why only me?"',
-    before: "Being the one everyone counts on never made me ask, ",
+    before: "I never asked ",
+    struck: '"Why only me?"',
+    middle: " I asked ",
+    highlighted: '"What\'s next?"',
     after:
-      " I take every responsibility as a chance to learn. I like being busy and getting the work done without excuses, and more than once, work I took on without expecting anything in return ended with people choosing to pay me for it.",
+      " Responsibility is my favourite teacher, busy is my default setting, and excuses never made it onto my to-do list. Fun fact: some of the work I took on for free ended with people insisting on paying me. Turns out, showing up is a business model.",
   },
-  quote: "NO EXCUSES. JUST WORK DONE.",
+  signature: { lead: "NO EXCUSES. JUST WORK ", accent: "DONE." },
+  counterLabel: "PROBLEMS SORTED TODAY:",
+  hint: {
+    pointer: "Throw me a problem — click the web.",
+    touch: "Tap the web to throw me a problem.",
+  },
+  /** Playful labels carried by the bugs (illustrations, not claims). */
+  bugLabels: [
+    "Last-minute order",
+    "Price war next door",
+    '"Just looking" customer',
+    "Stock ran out",
+    "Family function + delivery, same day",
+    "Supplier on holiday",
+    "Deadline: yesterday",
+    '"Beta, one small work…"',
+  ],
 } as const;
