@@ -40,6 +40,14 @@ export interface EngineOptions {
   allow: (p: Pt) => boolean;
   /** Calm motion: no bounce on the drop, bugs arrive less often. */
   calm?: boolean;
+  /** Edges bugs fly in from (default: all four). */
+  edges?: readonly ("top" | "right" | "bottom" | "left")[];
+  /** Horizontal range bugs enter within on the top/bottom edges. */
+  entryX?: { x0: number; x1: number };
+  /** How far a flight path may swerve (1 = full). */
+  wiggle?: number;
+  /** Bug labels stay inside this horizontal range (default: the section). */
+  labelBounds?: { x0: number; x1: number };
 }
 
 type BugState = "fly" | "stuck" | "wrap" | "sorted" | "fade";
@@ -151,6 +159,11 @@ export class SpiderEngine {
     });
   }
 
+  /** Update size-dependent options (entry range, label bounds) in place. */
+  configure(partial: Partial<EngineOptions>) {
+    Object.assign(this.opts, partial);
+  }
+
   setMouse(p: Pt | null) {
     this.mouse = p;
   }
@@ -221,8 +234,9 @@ export class SpiderEngine {
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
-    const w1 = (Math.random() - 0.5) * Math.min(220, len * 0.5);
-    const w2 = (Math.random() - 0.5) * Math.min(140, len * 0.3);
+    const wig = this.opts.wiggle ?? 1;
+    const w1 = (Math.random() - 0.5) * Math.min(220, len * 0.5) * wig;
+    const w2 = (Math.random() - 0.5) * Math.min(140, len * 0.3) * wig;
     const bug: Bug = {
       slot,
       state: "fly",
@@ -270,15 +284,18 @@ export class SpiderEngine {
     }
     if (spots.length) {
       const { i, k } = spots[Math.floor(Math.random() * spots.length)];
-      // enter from a random edge
-      const edge = Math.floor(Math.random() * 4);
+      // enter from one of the allowed edges
+      const edges = this.opts.edges ?? (["top", "right", "bottom", "left"] as const);
+      const edge = edges[Math.floor(Math.random() * edges.length)];
+      const ex = this.opts.entryX ?? { x0: 0, x1: g.W };
+      const atX = ex.x0 + Math.random() * (ex.x1 - ex.x0);
       const from =
-        edge === 0
-          ? { x: Math.random() * g.W, y: -30 }
-          : edge === 1
+        edge === "top"
+          ? { x: atX, y: -30 }
+          : edge === "right"
             ? { x: g.W + 30, y: Math.random() * g.H }
-            : edge === 2
-              ? { x: Math.random() * g.W, y: g.H + 30 }
+            : edge === "bottom"
+              ? { x: atX, y: g.H + 30 }
               : { x: -30, y: Math.random() * g.H };
       this.spawn(from, i, k);
     }
@@ -410,7 +427,10 @@ export class SpiderEngine {
           this.queue.push(b);
         }
       } else if (b.state === "stuck") {
+        const before = b.timer;
         b.timer += dt;
+        // the strands around a struggling bug keep trembling
+        if (Math.floor(b.timer / 0.9) > Math.floor(before / 0.9)) this.wobble(b.k, 0.004);
         // struggling: small rapid jitter
         b.pos = {
           x: b.to.x + Math.sin(this.time * 47 + b.seed) * 1.4,
@@ -522,8 +542,9 @@ export class SpiderEngine {
       const lw = this.labelW[b.slot];
       const labelEl = this.els.labels[b.slot];
       if (lw && labelEl) {
+        const lb = this.opts.labelBounds ?? { x0: 8, x1: this.geo.W - 8 };
         const left = b.pos.x - lw / 2;
-        const shift = left < 8 ? 8 - left : left + lw > this.geo.W - 8 ? this.geo.W - 8 - (left + lw) : 0;
+        const shift = left < lb.x0 ? lb.x0 - left : left + lw > lb.x1 ? lb.x1 - (left + lw) : 0;
         labelEl.style.transform = `translateX(calc(-50% + ${shift.toFixed(1)}px))`;
       }
       if (b.state === "fly" || b.state === "stuck") {

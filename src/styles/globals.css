@@ -1131,6 +1131,239 @@ section[id] {
   visibility: visible;
 }
 
+/* ---- depth: back web, breathing, device-tilt shift ---------------------- */
+.realme-layer {
+  translate: var(--rm-tx, 0px) var(--rm-ty, 0px);
+  transition: opacity 0.25s ease;
+}
+/* rotating / resizing: the scene steps out until the new web is measured */
+.realme[data-rotating="true"] .realme-layer {
+  opacity: 0;
+}
+.realme-breathe {
+  transform-origin: var(--hub-x, 50%) var(--hub-y, 50%);
+  animation: web-breathe 6s ease-in-out infinite;
+}
+@keyframes web-breathe {
+  0%,
+  100% {
+    scale: 0.985;
+  }
+  50% {
+    scale: 1.015;
+  }
+}
+.realme-web {
+  overflow: visible;
+}
+.web-back {
+  opacity: 0;
+  transition: opacity 1.4s ease 0.9s;
+}
+.realme-web.is-drawn .web-back {
+  opacity: 1;
+}
+.realme-web .web-back path {
+  stroke: rgba(21, 21, 21, 0.12);
+  stroke-width: 0.8;
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+}
+.web-back-drift {
+  animation: web-drift 22s ease-in-out infinite alternate;
+}
+@keyframes web-drift {
+  from {
+    transform: translate(-6px, 4px);
+  }
+  to {
+    transform: translate(8px, -5px);
+  }
+}
+.web-dew__glint {
+  fill: #fff;
+  stroke: none;
+  opacity: 0;
+}
+.realme-web.is-drawn .web-dew .web-dew__glint {
+  animation: dew-glint 3.6s ease-in-out 1.8s infinite;
+}
+
+/* ---- landscape phones: the desktop composition in one screen ------------ */
+section.realme--land {
+  height: 100vh;
+  height: 100svh;
+  /* the section fills the screen itself, padding below the fixed top bar */
+  scroll-margin-top: 0;
+}
+.realme-land {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: calc(4rem + 6px) max(1.25rem, env(safe-area-inset-right)) max(2px, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+}
+.realme-land__cols {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.realme-land__text {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-right: 0.9rem;
+}
+/* Read more: the copy scrolls inside its own column, the web never moves */
+/* the reading glow stays inside the column (no phantom scroll area) */
+.realme-land__text::before {
+  inset: 0;
+}
+.realme-land__text.is-more {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.realme-land__copy {
+  margin-block: auto;
+  padding-block: 4px;
+}
+.realme-land .eyebrow {
+  font-size: 0.6rem;
+}
+.realme-land .realme-title {
+  margin-top: 0.4rem;
+  /* height-led, capped by width so it stays on two lines */
+  font-size: clamp(1.1rem, min(4.2vh + 1vw, 2.7vw), 2rem);
+  line-height: 0.95;
+}
+.realme-land__intro {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.is-more .realme-land__intro {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+}
+.realme-land .realme-copy {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.realme-land__more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 0.15rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--red-text-light, #c42530);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.realme-land__web {
+  position: relative;
+  min-height: 0;
+}
+.realme-land__strip {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(21, 21, 21, 0.14);
+  white-space: nowrap;
+}
+.realme-land .realme-sign {
+  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+}
+.realme-land__count {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(0.4rem, 1.2vw, 0.7rem);
+  min-width: 0;
+}
+.realme-land__count > p:first-child {
+  font-size: clamp(0.56rem, 1.25vw, 0.64rem);
+  letter-spacing: clamp(0.06em, 0.25vw, 0.13em);
+}
+.realme-land__hint {
+  font-size: clamp(0.62rem, 1.35vw, 0.68rem);
+}
+.realme--land .web-bug__label,
+.realme--land .web-bug__tag {
+  bottom: 13px;
+  padding: 2px 7px;
+  font-size: 0.6rem;
+}
+.web-spider--xs {
+  width: 30px;
+  height: 30px;
+}
+
+/* landscape chips: title only; tap opens the one-liner inside the web column */
+.realme-node--chip .realme-knot {
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+}
+.realme-node--chip .realme-card {
+  width: max-content;
+  max-width: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(21, 21, 21, 0.1);
+}
+/* a comfortable touch target around the small chip */
+.realme-node--chip .realme-card::after {
+  content: "";
+  position: absolute;
+  inset: -8px -3px;
+}
+.realme-node--chip.is-below .realme-card {
+  top: 10px;
+}
+.realme-node--chip.is-above .realme-card {
+  bottom: 10px;
+}
+.realme-node--chip .realme-card__title {
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+.realme-node--chip.is-open .realme-card {
+  border-color: rgba(230, 56, 67, 0.55);
+}
+.realme-tip--land {
+  z-index: 3;
+  transform: none;
+  padding: 6px 9px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  pointer-events: none;
+}
+.realme-node.is-above .realme-tip--land {
+  bottom: auto;
+}
+
 /* pause every looping effect while the section is off-screen */
 .realme[data-paused="true"] *,
 .realme[data-paused="true"] *::before {
@@ -1140,6 +1373,11 @@ section[id] {
 @media (prefers-reduced-motion: reduce) {
   .bug-wing {
     animation: none !important;
+  }
+  /* no ambient movement: the web holds still */
+  .realme-breathe,
+  .web-back-drift {
+    animation: none;
   }
   .realme-web.is-drawn .web-spokes path {
     animation-duration: 1.5s;
