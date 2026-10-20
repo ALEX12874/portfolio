@@ -29,6 +29,12 @@ export interface WebGeometry {
   /** Stroke width per ring, thinning outward. */
   ringWidths: number[];
   dew: Pt[];
+  /**
+   * Path of ring k from spoke `from` to spoke `to` (going forward, wrapping),
+   * with exactly the same sag as the full ring — used to redraw only the few
+   * strand pieces near a bug when they tremble.
+   */
+  ringArc: (k: number, from: number, to: number) => string;
   /** Intersection of spoke i and ring k. */
   point: (i: number, k: number) => Pt;
   /** Nearest strand intersection to a point (only rings ≥ minRing). */
@@ -128,6 +134,8 @@ export function buildWeb(W: number, H: number, hub: Pt, compact: boolean, tilt: 
   const ringWidths = rings.map((rk) => +(1.1 - 0.4 * Math.min(1, rk / (reach * 0.8))).toFixed(2));
 
   // each ring segment between two spokes sags slightly toward the hub
+  // (ctrl[k][i] = control point of the segment that ends on spoke i)
+  const ctrl: Pt[][] = rings.map(() => new Array<Pt>(SPOKES));
   const ringPaths = rings.map((_, k) => {
     let d = "";
     for (let i = 0; i <= SPOKES; i += 1) {
@@ -145,6 +153,7 @@ export function buildWeb(W: number, H: number, hub: Pt, compact: boolean, tilt: 
       };
       const sag = 0.9 - rnd() * 0.04;
       const c = project(mid.x * sag, mid.y * sag);
+      ctrl[k][ii] = c;
       d += ` Q${f(c.x)} ${f(c.y)} ${f(p.x)} ${f(p.y)}`;
     }
     return d;
@@ -173,5 +182,18 @@ export function buildWeb(W: number, H: number, hub: Pt, compact: boolean, tilt: 
     return best;
   };
 
-  return { W, H, hub, dirs, radius, spokePaths, spokeSegs, ringPaths, ringWidths, dew, point, nearest };
+  const ringArc = (k: number, from: number, to: number) => {
+    const n = (((to - from) % SPOKES) + SPOKES) % SPOKES;
+    const a = point(from, k);
+    let d = `M${f(a.x)} ${f(a.y)}`;
+    for (let s = 1; s <= n; s += 1) {
+      const i = (from + s) % SPOKES;
+      const p = point(i, k);
+      const c = ctrl[k][i];
+      d += ` Q${f(c.x)} ${f(c.y)} ${f(p.x)} ${f(p.y)}`;
+    }
+    return d;
+  };
+
+  return { W, H, hub, dirs, radius, spokePaths, spokeSegs, ringPaths, ringWidths, dew, point, ringArc, nearest };
 }

@@ -61,8 +61,14 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
       if (!raf) raf = requestAnimationFrame(tick);
     };
 
+    // the stage rect is read once per hover (and after a scroll), not per move
+    let rect: DOMRect | null = null;
+    const onScroll = () => {
+      rect = null;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
     const onMove = (e: PointerEvent) => {
-      const r = stage.getBoundingClientRect();
+      const r = (rect ??= stage.getBoundingClientRect());
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
       target.x = Math.max(-1, Math.min(1, px * 2)) * MAX_TILT;
@@ -70,6 +76,7 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
       kick();
     };
     const onLeave = () => {
+      rect = null;
       target.x = 0;
       target.y = 0;
       kick();
@@ -80,6 +87,7 @@ export default function LogoSlab3D({ src, alt, width, height }: LogoSlab3DProps)
     return () => {
       stage.removeEventListener("pointermove", onMove);
       stage.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
   }, [calm]);

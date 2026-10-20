@@ -143,7 +143,10 @@ function BillboardPop({ variant, fit }: { variant: Variant; fit: Fit }) {
       const P: M3 = [s, 0, cx * (1 - s), 0, s, cy * (1 - s), 0, 0, 1];
       const L: M3 = [1, 0, 0, 0, 1, -lift * t, 0, 0, 1];
       layer.style.transform = toMatrix3d(mul(L, mul(H, P)));
-      layer.style.opacity = t > 0.002 || on ? "1" : "0";
+      const live = t > 0.002 || on;
+      layer.style.opacity = live ? "1" : "0";
+      // the LED chase runs only while the board is actually showing
+      if (layer.dataset.live !== (live ? "1" : "0")) layer.dataset.live = live ? "1" : "0";
       layer.style.setProperty("--pop", String(Math.max(0, Math.min(1.05, t))));
     };
 

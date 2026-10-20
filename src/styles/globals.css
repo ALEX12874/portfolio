@@ -357,7 +357,6 @@ section[id] {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .logo-slab__layer,
@@ -834,27 +833,16 @@ section[id] {
     stroke-dashoffset: 0;
   }
 }
-.web-dew circle {
-  fill: #f5f0e8;
-  stroke: rgba(21, 21, 21, 0.18);
-  stroke-width: 0.6;
-  opacity: 0;
-}
-.realme-web.is-drawn .web-dew circle {
-  animation: dew-glint 3.6s ease-in-out 1.8s infinite;
-}
-@keyframes dew-glint {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
+/* silk thread during the drop: a 1 px line stretched with scaleY */
 .web-thread {
-  stroke: rgba(21, 21, 21, 0.45);
-  stroke-width: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  background: rgba(21, 21, 21, 0.45);
+  transform-origin: 0 0;
+  transform: scaleY(0);
   transition: opacity 0.6s ease;
 }
 
@@ -865,15 +853,20 @@ section[id] {
   top: 0;
   width: 50px;
   height: 50px;
+}
+.realme[data-paused="false"] .web-spider {
   will-change: transform;
 }
 .web-spider--sm {
   width: 36px;
   height: 36px;
 }
+/* breathing on an HTML wrapper: composited (an SVG-child animation would
+   re-layout and repaint the spider every frame) */
 .spider-breathe {
-  transform-box: fill-box;
-  transform-origin: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 62%;
   animation: spider-breathe 2.6s ease-in-out infinite;
 }
 @keyframes spider-breathe {
@@ -882,7 +875,7 @@ section[id] {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
 }
 
@@ -921,6 +914,9 @@ section[id] {
 .bug-wing {
   transform-box: fill-box;
   transform-origin: 100% 50%;
+}
+/* wings flicker only in flight (an SVG animation runs on the main thread) */
+.web-bug.is-fly .bug-wing {
   animation: wing-flick 0.09s linear infinite alternate;
 }
 .bug-wing--r {
@@ -967,7 +963,11 @@ section[id] {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   transition: stroke-dashoffset 0.32s ease-out;
-  filter: drop-shadow(0 0 0.6px rgba(21, 21, 21, 0.5));
+}
+/* a thin dark edge under each wrap (replaces a drop-shadow filter) */
+.cocoon-wrap--edge {
+  stroke: rgba(21, 21, 21, 0.3);
+  stroke-width: 2.6;
 }
 .web-bug.is-wrap .cocoon-fill {
   opacity: 1;
@@ -1131,43 +1131,81 @@ section[id] {
   visibility: visible;
 }
 
-/* ---- depth: back web, breathing, device-tilt shift ---------------------- */
-.realme-layer {
-  translate: var(--rm-tx, 0px) var(--rm-ty, 0px);
+/* ---- depth layers: one raster web, breathing, drift (compositor only) ---- */
+/* the section is its own island: nothing inside can force page-wide layout
+   or paint, and far off-screen the browser skips it entirely */
+#real-me {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+@media (max-width: 767px) {
+  #real-me {
+    contain-intrinsic-size: auto 1100px;
+  }
+}
+.realme-raster,
+.realme-critters,
+.realme-chips {
   transition: opacity 0.25s ease;
 }
 /* rotating / resizing: the scene steps out until the new web is measured */
-.realme[data-rotating="true"] .realme-layer {
+.realme[data-rotating="true"] .realme-raster,
+.realme[data-rotating="true"] .realme-critters,
+.realme[data-rotating="true"] .realme-chips {
   opacity: 0;
 }
 .realme-breathe {
   transform-origin: var(--hub-x, 50%) var(--hub-y, 50%);
+}
+/* starts when the raster takes over, on the web and the critters together */
+.realme[data-breathe="on"] .realme-breathe {
   animation: web-breathe 6s ease-in-out infinite;
 }
+/* own GPU layers only while the section is on screen */
+.realme[data-paused="false"] .realme-raster,
+.realme[data-paused="false"] .realme-critters {
+  will-change: transform;
+}
+/* spider legs / pupils move with CSS transforms (no SVG re-layout) */
+.web-spider g[data-leg],
+.web-spider circle[data-pupil] {
+  transform-box: view-box;
+}
+/* transform (not the `scale` property): runs on the compositor everywhere */
 @keyframes web-breathe {
   0%,
   100% {
-    scale: 0.985;
+    transform: scale(1);
   }
-  50% {
-    scale: 1.015;
+  25% {
+    transform: scale(1.015);
+  }
+  75% {
+    transform: scale(0.985);
   }
 }
 .realme-web {
   overflow: visible;
 }
-.web-back {
-  opacity: 0;
-  transition: opacity 1.4s ease 0.9s;
+.web-canvas {
+  position: absolute;
+  display: block;
 }
-.realme-web.is-drawn .web-back {
+.web-main {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.web-main.is-on {
   opacity: 1;
 }
-.realme-web .web-back path {
-  stroke: rgba(21, 21, 21, 0.12);
-  stroke-width: 0.8;
-  stroke-dasharray: none;
-  stroke-dashoffset: 0;
+.web-canvas--back {
+  animation: web-back-in 1.4s ease 0.9s both;
+}
+@keyframes web-back-in {
+  from {
+    opacity: 0;
+  }
 }
 .web-back-drift {
   animation: web-drift 22s ease-in-out infinite alternate;
@@ -1180,13 +1218,43 @@ section[id] {
     transform: translate(8px, -5px);
   }
 }
-.web-dew__glint {
-  fill: #fff;
-  stroke: none;
+/* dew glints: tiny opacity-only layers over the dew drops in the raster */
+.web-glint {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #fff 0 30%, #f5f0e8 32%);
+  box-shadow: 0 0 0 0.6px rgba(21, 21, 21, 0.18);
   opacity: 0;
+  animation: glint 3.6s ease-in-out 1.8s infinite;
 }
-.realme-web.is-drawn .web-dew .web-dew__glint {
-  animation: dew-glint 3.6s ease-in-out 1.8s infinite;
+@keyframes glint {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+/* strand wobble: a few short strand pieces, redrawn and moved on the compositor */
+.web-wobble {
+  position: absolute;
+  pointer-events: none;
+}
+.web-wobble svg {
+  display: block;
+  overflow: visible;
+}
+.web-wobble path {
+  fill: none;
+  stroke: rgba(21, 21, 21, 0.23);
+}
+.web-wobble--cover path {
+  stroke: #efe8dc;
+  stroke-width: 2.6px;
 }
 
 /* ---- landscape phones: the desktop composition in one screen ------------ */
@@ -1374,10 +1442,11 @@ section.realme--land {
   .bug-wing {
     animation: none !important;
   }
-  /* no ambient movement: the web holds still */
-  .realme-breathe,
-  .web-back-drift {
-    animation: none;
+  /* no ambient movement: the finished web holds still */
+  .realme[data-breathe="on"] .realme-breathe,
+  .web-back-drift,
+  .web-glint {
+    animation: none !important;
   }
   .realme-web.is-drawn .web-spokes path {
     animation-duration: 1.5s;
@@ -1435,7 +1504,6 @@ section.realme--land {
   top: 0;
   transform-origin: 0 0;
   pointer-events: none;
-  will-change: transform, opacity;
   --pop: 0;
   filter: drop-shadow(0 calc(var(--pop) * 110px) calc(var(--pop) * 150px) rgba(21, 21, 21, 0.35))
     drop-shadow(0 0 calc(var(--pop) * 210px) rgba(230, 56, 67, 0.6));
@@ -1494,6 +1562,14 @@ section.realme--land {
 }
 .hero-pop__led--right {
   right: 2px;
+}
+/* a GPU layer only while the board is showing */
+.hero-pop[data-live="1"] {
+  will-change: transform, opacity;
+}
+/* hidden board: no LED chase (it repaints under the drop-shadow filter) */
+.hero-pop:not([data-live="1"]) .hero-pop__led {
+  animation-play-state: paused;
 }
 @keyframes led-chase {
   to {
@@ -1590,4 +1666,11 @@ html.lenis {
 }
 .lenis.lenis-smooth iframe {
   pointer-events: none;
+}
+
+/* ---- off-screen sections: every CSS animation pauses (lib/offscreenPause) ---- */
+[data-offscreen="true"] *,
+[data-offscreen="true"] *::before,
+[data-offscreen="true"] *::after {
+  animation-play-state: paused !important;
 }

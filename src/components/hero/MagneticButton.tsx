@@ -51,7 +51,7 @@ export default function MagneticButton({
 
   const inner = (
     <span
-      className="inline-flex items-center gap-2 will-change-transform"
+      className="inline-flex items-center gap-2"
       style={{
         transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
         transition: "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)",

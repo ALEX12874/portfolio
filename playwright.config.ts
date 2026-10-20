@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
 
 /**
@@ -7,11 +8,14 @@ import { defineConfig } from "@playwright/test";
  * choose one. The web server builds the site with a placeholder Web3Forms
  * key, so the backup path can be exercised too.
  */
-const browserPath =
-  process.env.CHROME_PATH ||
-  (process.platform === "win32"
-    ? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-    : "/usr/bin/chromium");
+const candidates =
+  process.platform === "win32"
+    ? [
+        "C:/Program Files/Google/Chrome/Application/chrome.exe",
+        "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+      ]
+    : ["/usr/bin/chromium", "/usr/bin/google-chrome"];
+const browserPath = process.env.CHROME_PATH || candidates.find((p) => existsSync(p)) || candidates[0];
 
 const out = "node_modules/.cache/contact-test";
 const vite = `"${process.execPath}" node_modules/vite/bin/vite.js`;

@@ -2,12 +2,17 @@ import { devices, expect, test, type Page } from "@playwright/test";
 
 /**
  * Smoke test run by `npm run check` before every deploy: tour the whole page
- * and fail on any console error, page error or failed request.
+ * and fail on any console error or warning, page error, unhandled promise
+ * rejection or failed request.
  *
  *   - scroll every section into view (all deferred chunks mount)
+ *   - open the menu and navigate with it
  *   - switch all 4 projects
- *   - open both experiences
- *   - the Real Me spider sorts at least one problem (counter rises)
+ *   - open both experiences (and the certificate viewer)
+ *   - contact form: empty submit shows inline errors (nothing is sent)
+ *   - the Real Me spider sorts at least one problem (counter rises); a click
+ *     throws a bug; skill nodes respond; on a landscape phone the one-screen
+ *     layout, chip tooltips and live rotation work
  *   - the hero billboard pops on hover (desktop) and on tap (phone)
  */
 
@@ -16,7 +21,7 @@ type Problems = string[];
 function watch(page: Page): Problems {
   const problems: Problems = [];
   page.on("console", (m) => {
-    if (m.type() === "error") problems.push(`console: ${m.text()}`);
+    if (m.type() === "error" || m.type() === "warning") problems.push(`console ${m.type()}: ${m.text()}`);
   });
   page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
   page.on("requestfailed", (r) => {
@@ -64,6 +69,78 @@ async function projectsAndExperience(page: Page) {
   }
 }
 
+/** Problems plus any promise rejection the page caught (main.tsx records them). */
+async function allProblems(page: Page, problems: Problems) {
+  const rejected = await page.evaluate(
+    () => (window as unknown as { __unhandledRejections?: string[] }).__unhandledRejections ?? []
+  );
+  return [...problems, ...rejected.map((r) => `unhandled rejection: ${r}`)];
+}
+
+async function menuNavigates(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: /menu/i }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: /Perspectives/ }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const r = document.getElementById("perspectives")?.getBoundingClientRect();
+          return !!r && r.top < window.innerHeight / 2 && r.bottom > 0;
+        }),
+      { timeout: 6000 }
+    )
+    .toBe(true);
+}
+
+async function certificateViewer(page: Page) {
+  await page.evaluate(() => document.getElementById("experience")?.scrollIntoView({ behavior: "instant" }));
+  const rows = page.locator("#experience button[aria-label$='open details']");
+  for (let i = 0; i < 2; i += 1) {
+    await rows.nth(i).click();
+    const larger = page.getByRole("button", { name: "View certificate larger" });
+    if (await larger.count()) {
+      await larger.first().click();
+      const close = page.getByRole("button", { name: "Close certificate viewer" });
+      await expect(close).toBeVisible();
+      await close.click();
+      await expect(close).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      return;
+    }
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+  throw new Error("no experience offers a certificate viewer");
+}
+
+async function contactValidation(page: Page) {
+  await page.evaluate(() => document.getElementById("contact")?.scrollIntoView({ behavior: "instant" }));
+  const form = page.locator("#contact form");
+  await form.locator("button[type=submit]").click();
+  await expect(form.locator("[aria-invalid=true]").first()).toBeVisible();
+}
+
+async function realMeInteractions(page: Page) {
+  await page.evaluate(() => document.getElementById("real-me")?.scrollIntoView({ behavior: "instant" }));
+  await page.waitForTimeout(2500);
+  // throw a bug onto the web, away from the copy and the nodes
+  const sec = page.locator("#real-me");
+  const box = await sec.boundingBox();
+  if (!box) throw new Error("Real Me has no box");
+  const hub = await sec.evaluate((el) => ({
+    x: parseFloat(getComputedStyle(el).getPropertyValue("--hub-x")),
+    y: parseFloat(getComputedStyle(el).getPropertyValue("--hub-y")),
+  }));
+  await page.mouse.click(box.x + hub.x + 90, box.y + hub.y + 20);
+  await page.locator("#real-me [data-node] .realme-card").first().hover();
+  await page.waitForTimeout(800);
+}
+
 async function spiderSorts(page: Page) {
   await page.evaluate(() => document.getElementById("real-me")?.scrollIntoView({ behavior: "instant" }));
   const counter = page.locator("#real-me [aria-live]");
@@ -76,6 +153,7 @@ test.describe("desktop", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("tour, projects, experience, spider, billboard hover", async ({ page }) => {
+    test.setTimeout(180_000);
     const problems = watch(page);
     await page.goto("/");
     await page.waitForLoadState("load");
@@ -108,10 +186,15 @@ test.describe("desktop", () => {
     }
 
     await tour(page);
+    await menuNavigates(page);
     await projectsAndExperience(page);
+    await certificateViewer(page);
+    await contactValidation(page);
+    await realMeInteractions(page);
     await spiderSorts(page);
 
-    expect(problems, problems.join("\n")).toEqual([]);
+    const all = await allProblems(page, problems);
+    expect(all, all.join("\n")).toEqual([]);
   });
 });
 
@@ -150,10 +233,46 @@ test.describe("phone", () => {
     expect(down - up).toBeGreaterThan(1400);
 
     await tour(page);
+    await menuNavigates(page);
     await projectsAndExperience(page);
     await spiderSorts(page);
 
-    expect(problems, problems.join("\n")).toEqual([]);
+    const all = await allProblems(page, problems);
+    expect(all, all.join("\n")).toEqual([]);
+  });
+});
+
+test.describe("landscape phone", () => {
+  test.use({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+
+  test("Real Me: one screen, chip tooltips, live rotation", async ({ page }) => {
+    const problems = watch(page);
+    await page.goto("/");
+    await page.waitForLoadState("load");
+    await tour(page);
+    const sec = page.locator("#real-me");
+    await page.evaluate(() => document.getElementById("real-me")?.scrollIntoView({ behavior: "instant" }));
+    await expect(sec).toHaveClass(/realme--land/);
+    expect(Math.round((await sec.boundingBox())?.height ?? 0)).toBe(390);
+
+    // every chip opens its one-liner
+    const chips = sec.locator("[data-node] .realme-card");
+    await expect(chips).toHaveCount(5);
+    for (let i = 0; i < 5; i += 1) {
+      await chips.nth(i).tap();
+      await expect(sec.locator("[data-node] .realme-tip").nth(i)).toBeVisible();
+    }
+    await spiderSorts(page);
+
+    // rotate to portrait and back: the layout follows live
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(sec).not.toHaveClass(/realme--land/);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(sec).toHaveClass(/realme--land/);
+    await expect(sec).toHaveAttribute("data-rotating", "false", { timeout: 3000 });
+
+    const all = await allProblems(page, problems);
+    expect(all, all.join("\n")).toEqual([]);
   });
 });
 
@@ -168,6 +287,7 @@ test.describe("small phone", () => {
     await spiderSorts(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBe(0);
-    expect(problems, problems.join("\n")).toEqual([]);
+    const all = await allProblems(page, problems);
+    expect(all, all.join("\n")).toEqual([]);
   });
 });

@@ -16,42 +16,92 @@ function toneForSection(id: string | null, el?: HTMLElement | null): Tone {
   return INK_SECTIONS.has(id) ? "ivory" : "ink";
 }
 
-/** Tracks which section sits beneath the fixed bar so its text can adapt. */
+/**
+ * Tracks which section sits beneath the fixed bar so its text can adapt.
+ * An IntersectionObserver watches a 1 px band just under the bar, so
+ * scrolling never reads layout (no getBoundingClientRect per frame).
+ */
 function useSectionAtTop(): Tone {
   const [tone, setTone] = useState<Tone>("ink");
 
   useEffect(() => {
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const probe = 44; // just under the bar
-      let current: string | null = null;
+    if (typeof IntersectionObserver === "undefined") return undefined;
+    const PROBE = 44; // just under the bar
+    const hit = new Map<Element, boolean>();
+    const observed = new WeakSet<Element>();
+    let io: IntersectionObserver | null = null;
+
+    const apply = () => {
       let currentEl: HTMLElement | null = null;
       for (const s of sections) {
         const el = document.getElementById(s.id);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        if (r.top <= probe && r.bottom > probe) {
-          current = s.id;
+        if (el && hit.get(el)) {
           currentEl = el;
           break;
         }
       }
-      setTone(toneForSection(current, currentEl));
+      setTone(toneForSection(currentEl?.id ?? null, currentEl));
     };
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(measure);
+    const observeAll = () => {
+      for (const s of sections) {
+        const el = document.getElementById(s.id);
+        if (el && io && !observed.has(el)) {
+          observed.add(el);
+          io.observe(el);
+        }
+      }
     };
-    measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    const build = () => {
+      io?.disconnect();
+      hit.clear();
+      const below = Math.max(0, window.innerHeight - PROBE - 1);
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) hit.set(e.target, e.isIntersecting);
+          apply();
+        },
+        { rootMargin: `-${PROBE}px 0px -${below}px 0px` }
+      );
+      // a fresh observer: everything is observed again
+      for (const s of sections) {
+        const el = document.getElementById(s.id);
+        if (el) {
+          observed.add(el);
+          io.observe(el);
+        }
+      }
+    };
+    build();
+
+    // lazy sections replace their placeholders: observe the new elements
+    let mutRaf = 0;
+    const mo = new MutationObserver(() => {
+      if (!mutRaf)
+        mutRaf = requestAnimationFrame(() => {
+          mutRaf = 0;
+          observeAll();
+        });
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    let resizeRaf = 0;
+    const onResize = () => {
+      if (!resizeRaf)
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = 0;
+          build();
+        });
+    };
+    window.addEventListener("resize", onResize, { passive: true });
     // a section changed its own tone (project world switch)
-    window.addEventListener("section-tone", onScroll);
+    window.addEventListener("section-tone", apply);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      window.removeEventListener("section-tone", onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
+      io?.disconnect();
+      mo.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("section-tone", apply);
+      if (mutRaf) cancelAnimationFrame(mutRaf);
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
     };
   }, []);
 
@@ -65,10 +115,20 @@ export default function TopBar() {
   const menuBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      setScrolled(window.scrollY > 12);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(read);
+    };
+    read();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   const close = () => {

@@ -2,8 +2,13 @@ import { SPOKES, type Pt, type WebGeometry } from "./webGeometry";
 
 /**
  * One requestAnimationFrame loop for the spider and the bugs. Everything is
- * written straight to DOM transforms/attributes (no React state per frame);
- * the only React update is the sorted-counter callback, a few times a minute.
+ * written straight to DOM transforms/attributes (no React state per frame),
+ * and only when a value actually changed; the only React update is the
+ * sorted-counter callback, a few times a minute.
+ *
+ * The loop runs only while the section is on screen and the tab is visible
+ * (the owner calls start/stop; hidden tabs stop it here). On the `low` tier
+ * it renders at 30 fps; motion is time-based, so speeds never change.
  */
 
 /** Leg roots (spider SVG local coords, facing up). Shared with the JSX. */
@@ -24,10 +29,12 @@ export interface EngineEls {
   spider: HTMLDivElement;
   legs: SVGGElement[];
   pupils: SVGCircleElement[];
-  thread: SVGLineElement;
+  /** Silk thread during the drop: a 1 px div moved by transforms. */
+  thread: HTMLDivElement;
   slots: SlotEls[];
-  rings: SVGPathElement[];
   labels: HTMLSpanElement[];
+  /** Host for the short-lived strand-wobble overlays (same layer as the bugs). */
+  wobbleHost: HTMLDivElement;
 }
 
 export interface EngineOptions {
@@ -48,7 +55,17 @@ export interface EngineOptions {
   wiggle?: number;
   /** Bug labels stay inside this horizontal range (default: the section). */
   labelBounds?: { x0: number; x1: number };
+  /** Render at 30 fps (phones / low tier). */
+  fps30?: boolean;
+  /** Strands tremble where a bug lands / struggles (off on the low tier). */
+  wobble?: boolean;
+  /** Seconds between new bugs [min, max]. */
+  spawnEvery?: [number, number];
+  /** Called once if frames stay slow (median > 22 ms over ~3 s). */
+  onSlow?: () => void;
 }
+
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 type BugState = "fly" | "stuck" | "wrap" | "sorted" | "fade";
 
@@ -103,6 +120,13 @@ export class SpiderEngine {
   private raf = 0;
   private last = 0;
   private time = 0;
+  /** 30 fps cap: time collected since the last rendered frame. */
+  private acc = 0;
+  /** Slow-frame watch (60 fps tiers only). */
+  private slowDts: number[] = [];
+  private slowReported = false;
+  /** Paused because the tab is hidden (resume when it comes back). */
+  private hiddenPause = false;
 
   private spider = {
     x: 0,
@@ -130,8 +154,34 @@ export class SpiderEngine {
     this.opts = opts;
     this.spider.x = geo.hub.x;
     this.spider.y = -opts.size;
+    document.addEventListener("visibilitychange", this.onVisibility);
+    els.thread.style.opacity = "";
     this.render();
   }
+
+  private onVisibility = () => {
+    if (document.hidden && this.running) {
+      this.hiddenPause = true;
+      this.stop();
+    } else if (!document.hidden && this.hiddenPause) {
+      this.hiddenPause = false;
+      this.start();
+    }
+  };
+
+  /** Write a style/attribute only when it changed. */
+  private put(el: Element, key: string, value: string, apply: (v: string) => void) {
+    const id = `${key}`;
+    let m = this.writtenFor.get(el);
+    if (!m) {
+      m = new Map();
+      this.writtenFor.set(el, m);
+    }
+    if (m.get(id) === value) return;
+    m.set(id, value);
+    apply(value);
+  }
+  private writtenFor = new WeakMap<Element, Map<string, string>>();
 
   /* ---------------------------------------------------------------- API */
 
@@ -141,19 +191,23 @@ export class SpiderEngine {
   }
 
   start() {
-    if (this.running) return;
+    if (this.running || document.hidden) return;
     this.running = true;
     this.last = performance.now();
+    this.acc = 0;
     this.raf = requestAnimationFrame(this.tick);
   }
 
   stop() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+    this.slowDts = [];
   }
 
   destroy() {
     this.stop();
+    document.removeEventListener("visibilitychange", this.onVisibility);
+    this.clearWobbles();
     this.els.slots.forEach((slot) => {
       if (slot?.root) slot.root.className = "web-bug";
     });
@@ -180,6 +234,8 @@ export class SpiderEngine {
   /** Geometry changed (resize): restart the scene on the new web. */
   setGeometry(geo: WebGeometry) {
     this.geo = geo;
+    this.clearWobbles();
+    this.writtenFor = new WeakMap();
     this.bugs.forEach((b) => this.hideSlot(b.slot));
     this.bugs = [];
     this.queue = [];
@@ -199,20 +255,38 @@ export class SpiderEngine {
   /** Point the vibration at a skill node (hover). */
   vibrateAt(p: Pt) {
     const n = this.geo.nearest(p, 1);
-    this.wobble(n.k, 0.008);
+    this.wobble(n.k, 0.008, n.i);
   }
 
   /* -------------------------------------------------------------- loop */
 
   private tick = (now: number) => {
     if (!this.running) return;
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const frame = now - this.last;
     this.last = now;
+    this.raf = requestAnimationFrame(this.tick);
+    this.watchSlow(frame);
+    this.acc += frame;
+    // 30 fps cap: skip every other frame (time keeps accumulating)
+    if (this.opts.fps30 && this.acc < 30) return;
+    const dt = Math.min(0.05, this.acc / 1000);
+    this.acc = 0;
     this.time += dt;
     this.update(dt);
     this.render();
-    this.raf = requestAnimationFrame(this.tick);
   };
+
+  private watchSlow(frame: number) {
+    if (this.opts.fps30 || this.slowReported || !this.opts.onSlow || frame <= 0 || frame > 250) return;
+    this.slowDts.push(frame);
+    if (this.slowDts.length < 180) return;
+    const sorted = [...this.slowDts].sort((a, b) => a - b);
+    this.slowDts = [];
+    if (sorted[90] > 22) {
+      this.slowReported = true;
+      this.opts.onSlow();
+    }
+  }
 
   private activeCount() {
     return this.bugs.filter((b) => b.state !== "fade").length;
@@ -260,10 +334,11 @@ export class SpiderEngine {
     if (labelEl) {
       labelEl.textContent = label;
       labelEl.style.transform = "";
+      this.writtenFor.delete(labelEl);
       this.labelW[slot] = labelEl.offsetWidth;
     }
     const root = this.els.slots[slot].root;
-    root.className = "web-bug is-on";
+    root.className = "web-bug is-on is-fly";
     root.dataset.kind = String(Math.floor(Math.random() * 3));
     this.bugs.push(bug);
   }
@@ -307,24 +382,80 @@ export class SpiderEngine {
     return pts;
   }
 
-  private wobble(k: number, amp: number) {
+  /**
+   * Strands tremble around spoke i, ring k: only the strand pieces nearest
+   * the bug are redrawn in a tiny overlay that wobbles on the compositor and
+   * is then removed. A static "cover" in the background colour hides the
+   * resting strand underneath while it moves.
+   */
+  private wobble(k: number, amp: number, i: number) {
+    if (!this.opts.wobble) return;
+    const host = this.els.wobbleHost;
+    if (!host || typeof host.animate !== "function" || host.childElementCount > 6) return;
     const g = this.geo;
-    [k - 1, k, k + 1].forEach((kk, n) => {
-      const el = this.els.rings[kk];
-      if (!el || typeof el.animate !== "function") return;
-      const a = n === 1 ? amp : amp * 0.45;
-      el.style.transformOrigin = `${g.hub.x}px ${g.hub.y}px`;
-      el.animate(
-        [
-          { transform: "scale(1)" },
-          { transform: `scale(${1 + a})` },
-          { transform: `scale(${1 - a * 0.6})` },
-          { transform: `scale(${1 + a * 0.25})` },
-          { transform: "scale(1)" },
-        ],
-        { duration: 750, easing: "ease-out" }
-      );
-    });
+    const rings = [k - 1, k, k + 1].filter((kk) => kk >= 1 && kk < g.radius[0].length);
+    if (!rings.length) return;
+    // bounding box of the strand pieces (plus room for the sag and the wobble)
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const kk of rings) {
+      for (let s = -1; s <= 1; s += 1) {
+        const q = g.point(i + s, kk);
+        x0 = Math.min(x0, q.x);
+        y0 = Math.min(y0, q.y);
+        x1 = Math.max(x1, q.x);
+        y1 = Math.max(y1, q.y);
+      }
+    }
+    const pad = 14;
+    x0 = Math.floor(x0 - pad);
+    y0 = Math.floor(y0 - pad);
+    const w = Math.ceil(x1 + pad - x0);
+    const h = Math.ceil(y1 + pad - y0);
+    const box = (cls: string) => {
+      const div = document.createElement("div");
+      div.className = cls;
+      div.style.cssText = `left:${x0}px;top:${y0}px;width:${w}px;height:${h}px`;
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", `${x0} ${y0} ${w} ${h}`);
+      svg.setAttribute("width", String(w));
+      svg.setAttribute("height", String(h));
+      for (const kk of rings) {
+        const path = document.createElementNS(SVG_NS, "path");
+        path.setAttribute("d", g.ringArc(kk, i - 1, i + 1));
+        path.setAttribute("stroke-width", String(g.ringWidths[kk] ?? 1));
+        svg.appendChild(path);
+      }
+      div.appendChild(svg);
+      host.appendChild(div);
+      return div;
+    };
+    const cover = box("web-wobble web-wobble--cover");
+    const strand = box("web-wobble");
+    strand.style.transformOrigin = `${(g.hub.x - x0).toFixed(1)}px ${(g.hub.y - y0).toFixed(1)}px`;
+    const anim = strand.animate(
+      [
+        { transform: "scale(1)" },
+        { transform: `scale(${1 + amp})` },
+        { transform: `scale(${1 - amp * 0.6})` },
+        { transform: `scale(${1 + amp * 0.25})` },
+        { transform: "scale(1)" },
+      ],
+      { duration: 750, easing: "ease-out" }
+    );
+    const done = () => {
+      cover.remove();
+      strand.remove();
+    };
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+
+  private clearWobbles() {
+    const host = this.els.wobbleHost;
+    while (host?.firstChild) host.removeChild(host.firstChild);
   }
 
   private hideSlot(slot: number) {
@@ -356,6 +487,7 @@ export class SpiderEngine {
         s.state = "idle";
         s.y = g.hub.y;
         this.els.thread.style.opacity = "0";
+        this.writtenFor.delete(this.els.thread);
       }
     } else if (s.state === "idle") {
       const next = this.queue.shift();
@@ -422,15 +554,16 @@ export class SpiderEngine {
         b.pos = { x: p.x + Math.cos(b.heading + Math.PI / 2) * wob, y: p.y + Math.sin(b.heading + Math.PI / 2) * wob };
         if (t >= 1) {
           b.state = "stuck";
+          this.els.slots[b.slot].root.classList.remove("is-fly");
           b.pos = { ...b.to };
-          this.wobble(b.k, 0.012);
+          this.wobble(b.k, 0.012, b.i);
           this.queue.push(b);
         }
       } else if (b.state === "stuck") {
         const before = b.timer;
         b.timer += dt;
         // the strands around a struggling bug keep trembling
-        if (Math.floor(b.timer / 0.9) > Math.floor(before / 0.9)) this.wobble(b.k, 0.004);
+        if (Math.floor(b.timer / 0.9) > Math.floor(before / 0.9)) this.wobble(b.k, 0.004, b.i);
         // struggling: small rapid jitter
         b.pos = {
           x: b.to.x + Math.sin(this.time * 47 + b.seed) * 1.4,
@@ -459,7 +592,8 @@ export class SpiderEngine {
       this.spawnIn -= dt;
       if (this.spawnIn <= 0) {
         if (this.activeCount() < this.opts.cap) this.spawnRandom();
-        this.spawnIn = (2.5 + Math.random() * 1.5) * (this.opts.calm ? 1.6 : 1);
+        const [lo, hi] = this.opts.spawnEvery ?? [2.5, 4];
+        this.spawnIn = lo + Math.random() * (hi - lo);
       }
     }
   }
@@ -492,13 +626,18 @@ export class SpiderEngine {
   private render() {
     const s = this.spider;
     const half = this.opts.size / 2;
-    this.els.spider.style.transform = `translate3d(${(s.x - half).toFixed(1)}px, ${(s.y - half).toFixed(1)}px, 0) rotate(${s.angle.toFixed(3)}rad)`;
+    const sp = this.els.spider;
+    this.put(sp, "t", `translate3d(${(s.x - half).toFixed(1)}px, ${(s.y - half).toFixed(1)}px, 0) rotate(${s.angle.toFixed(2)}rad)`, (v) => {
+      sp.style.transform = v;
+    });
 
-    // silk thread during the drop
+    // silk thread during the drop (a 1 px div stretched with scaleY)
     if (s.state === "wait" || s.state === "drop") {
-      this.els.thread.setAttribute("x1", s.x.toFixed(1));
-      this.els.thread.setAttribute("x2", s.x.toFixed(1));
-      this.els.thread.setAttribute("y2", Math.max(0, s.y - 4).toFixed(1));
+      const th = this.els.thread;
+      const len = Math.max(0, s.y - 4);
+      this.put(th, "t", `translate3d(${s.x.toFixed(1)}px, 0, 0) scaleY(${len.toFixed(1)})`, (v) => {
+        th.style.transform = v;
+      });
     }
 
     // legs
@@ -510,13 +649,15 @@ export class SpiderEngine {
       let a = 0;
       if (walking) a = Math.sin(s.legPhase + group) * 16 * side;
       else if (n === s.twitchLeg) a = Math.sin(this.time * 40) * 7;
-      const r = LEG_ROOTS[n];
-      leg.setAttribute("transform", `rotate(${a.toFixed(2)} ${r.x} ${r.y})`);
+      this.put(leg, "t", `rotate(${a.toFixed(1)}deg)`, (v) => {
+        leg.style.transform = v;
+      });
     });
 
-    // eyes follow the cursor (or the nearest bug)
-    const look =
-      this.mouse ?? this.bugs.find((b) => b.state === "fly" || b.state === "stuck")?.pos ?? null;
+    // eyes follow the cursor (or the nearest bug — a stuck one at its resting
+    // point, so its struggle jitter does not move the eyes every frame)
+    const near = this.bugs.find((b) => b.state === "fly" || b.state === "stuck");
+    const look = this.mouse ?? (near ? (near.state === "stuck" ? near.to : near.pos) : null);
     this.els.pupils.forEach((p, n) => {
       const base = PUPIL_BASE[n];
       let ox = 0;
@@ -531,24 +672,33 @@ export class SpiderEngine {
         ox = ((wx * c - wy * sn) / d) * 0.75;
         oy = ((wx * sn + wy * c) / d) * 0.75;
       }
-      p.setAttribute("cx", (base.x + ox).toFixed(2));
-      p.setAttribute("cy", (base.y + oy).toFixed(2));
+      // one CSS transform instead of rewriting cx/cy (quarter-pixel steps)
+      const q = (v: number) => (Math.round(v * 4) / 4).toFixed(2);
+      this.put(p, "t", `translate(${q(ox)}px, ${q(oy + 0.4)}px)`, (v) => {
+        p.style.transform = v;
+      });
     });
 
     // bugs
     for (const b of this.bugs) {
       const { root, body } = this.els.slots[b.slot];
-      root.style.transform = `translate3d(${b.pos.x.toFixed(1)}px, ${b.pos.y.toFixed(1)}px, 0)`;
+      this.put(root, "t", `translate3d(${b.pos.x.toFixed(1)}px, ${b.pos.y.toFixed(1)}px, 0)`, (v) => {
+        root.style.transform = v;
+      });
       const lw = this.labelW[b.slot];
       const labelEl = this.els.labels[b.slot];
       if (lw && labelEl) {
         const lb = this.opts.labelBounds ?? { x0: 8, x1: this.geo.W - 8 };
         const left = b.pos.x - lw / 2;
         const shift = left < lb.x0 ? lb.x0 - left : left + lw > lb.x1 ? lb.x1 - (left + lw) : 0;
-        labelEl.style.transform = `translateX(calc(-50% + ${shift.toFixed(1)}px))`;
+        this.put(labelEl, "t", `translateX(calc(-50% + ${shift.toFixed(1)}px))`, (v) => {
+          labelEl.style.transform = v;
+        });
       }
       if (b.state === "fly" || b.state === "stuck") {
-        body.style.transform = `rotate(${(b.heading + Math.PI / 2).toFixed(3)}rad)`;
+        this.put(body, "t", `rotate(${(b.heading + Math.PI / 2).toFixed(2)}rad)`, (v) => {
+          body.style.transform = v;
+        });
       }
     }
   }

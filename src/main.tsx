@@ -31,6 +31,14 @@ window.addEventListener("vite:preloadError", (event) => {
   window.location.reload();
 });
 
+// a promise nobody handled must never surface as an uncaught error: keep a
+// record (the smoke test fails on any) instead of letting it reach the console
+window.addEventListener("unhandledrejection", (event) => {
+  event.preventDefault();
+  const w = window as Window & { __unhandledRejections?: string[] };
+  (w.__unhandledRejections ??= []).push(String(event.reason));
+});
+
 // `?capture=1` renders only the hero scene for the video export script
 const capture = new URLSearchParams(window.location.search).get("capture") === "1";
 
