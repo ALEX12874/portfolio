@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useContext, useEffect, useRef, useState } from "react";
 import DottedBackground from "../layout/DottedBackground";
 import HeroText from "./HeroText";
 import HeroVideo from "./HeroVideo";
@@ -7,8 +7,12 @@ import { useWebGLSupport } from "../../hooks/useWebGLSupport";
 import { useMotionLevel } from "../../hooks/useMotionLevel";
 import { useSceneTurn } from "../../lib/sceneArbiter";
 import type { SceneTier } from "./HeroScene/Scene";
+import { StaticRender } from "../../lib/shell";
+import { markHeroSceneDone, useSettled, whenLiveSceneMayStart } from "../../lib/settle";
+import { load3d } from "../../lib/load3d";
 
-const Scene = lazy(() => import("./HeroScene/Scene"));
+// the 3D libraries arrive in idle-time steps, then the scene itself
+const Scene = lazy(() => load3d().then(() => import("./HeroScene/Scene")));
 
 /**
  * Remembered for the rest of the page's life (not persisted): once a device
@@ -48,9 +52,12 @@ const FADE_MS = 700;
 function SceneStage() {
   const calm = useMotionLevel() === "calm";
   const tier = useLiveTier();
-  // only probe WebGL where the live scene could actually run
-  const webgl = useWebGLSupport(!!tier && !calm);
   const [failed, setFailed] = useState(liveSceneFailed);
+  // the live scene (three.js) — and even the WebGL probe — wait until the
+  // first screen is painted, the page is idle and the visit is ≥ 5 s old
+  const settledPage = useSettled(!!tier && !calm && !failed, whenLiveSceneMayStart);
+  // only probe WebGL where the live scene could actually run
+  const webgl = useWebGLSupport(!!tier && !calm && settledPage);
   const [ready, setReady] = useState(false);
   const [videoGone, setVideoGone] = useState(false);
   const touch = useRef(false);
@@ -68,8 +75,14 @@ function SceneStage() {
   const onReady = useCallback(() => setReady(true), []);
 
   // calm motion keeps the gentle video loop (no camera moves or parallax)
-  const useLive = webgl && !calm && !!tier && !failed;
+  const useLive = webgl && !calm && !!tier && !failed && settledPage;
   const live = useLive && ready;
+
+  // let the solar system build once this scene is on screen — or once it is
+  // clear there won't be one (phone, calm motion, no WebGL, too slow)
+  useEffect(() => {
+    if (live || failed || calm || !tier || (settledPage && !webgl)) markHeroSceneDone();
+  }, [live, failed, calm, tier, settledPage, webgl]);
   // one WebGL scene at a time: the hero only renders while it is the most
   // visible scene (the solar system takes over further down)
   const { ref, active } = useSceneTurn<HTMLDivElement>("hero", useLive);
@@ -120,6 +133,11 @@ function SceneStage() {
   );
 }
 
+/** Build-time static copy: just the poster; in the browser, the live stage. */
+function HeroStage() {
+  return useContext(StaticRender) ? <HeroVideo /> : <SceneStage />;
+}
+
 export default function Hero() {
   return (
     <section
@@ -139,7 +157,7 @@ export default function Hero() {
           (fixed aspect, so nothing shifts); right-anchored 52vw, full height
           from lg and on short landscape phones */}
       <div className="hero-band relative w-full">
-        <SceneStage />
+        <HeroStage />
       </div>
     </section>
   );

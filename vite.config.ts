@@ -25,12 +25,31 @@ export default defineConfig(({ mode }) => {
     },
     // no console noise / debugger statements in production bundles
     esbuild: mode === "production" ? { drop: ["console", "debugger"] } : undefined,
+    // the build-time first-screen render (npm run build:shell) bundles its
+    // dependencies, so Node never has to load a package's raw ESM
+    ssr: { noExternal: true },
     optimizeDeps: {
       include: ["three", "@react-three/fiber", "@react-three/drei"],
     },
     build: {
       target: "es2020",
       chunkSizeWarningLimit: 1600,
+      rollupOptions: {
+        output: {
+          // vendor chunks: React + framer-motion load with the shell; three
+          // and fiber are separate chunks that only lazy code imports (loaded
+          // in idle-time steps, lib/load3d); drei members and pdf.js stay in
+          // their own lazy chunks
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (/[\/]node_modules[\/](react|react-dom|scheduler)[\/]/.test(id)) return "react";
+            if (/[\/]node_modules[\/](framer-motion|motion-dom|motion-utils)[\/]/.test(id)) return "motion";
+            if (/[\/]node_modules[\/]three[\/]/.test(id)) return "three";
+            if (/[\/]node_modules[\/](@react-three[\/]fiber|react-reconciler|zustand|its-fine|suspend-react)[\/]/.test(id)) return "r3f";
+            return undefined;
+          },
+        },
+      },
     },
   };
 });

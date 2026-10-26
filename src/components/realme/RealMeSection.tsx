@@ -704,6 +704,11 @@ export default function RealMeSection() {
     typeof window === "undefined" ? "desk" : modeFor(window.innerWidth)
   );
   const [touch, setTouch] = useState(false);
+  // the web (geometry, chips, spider engine) is only built once the section
+  // comes within ~1.5 screens: mounting the section stays a light task
+  const [near, setNear] = useState(false);
+  const nearRef = useRef(false);
+  nearRef.current = near;
   const { ref: revealRef, shown } = useReveal<HTMLDivElement>("0px 0px -20% 0px");
   const { ref: textRef, shown: textShown } = useReveal<HTMLDivElement>();
   const drawn = shown;
@@ -800,7 +805,7 @@ export default function RealMeSection() {
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       rotatingRef.current = false;
-      measure();
+      if (nearRef.current) measure();
       if (sec) sec.dataset.rotating = "false";
       setRunning(visibleRef.current && drawnRef.current);
     }, 150);
@@ -808,10 +813,24 @@ export default function RealMeSection() {
 
   useEffect(() => () => window.clearTimeout(settleTimer.current), []);
 
-  // first measure right away; later size changes settle first
+  useEffect(() => {
+    const sec = sectionRef.current;
+    if (near || !sec) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return undefined;
+    }
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && setNear(true), {
+      rootMargin: "150% 0px",
+    });
+    io.observe(sec);
+    return () => io.disconnect();
+  }, [near]);
+
+  // first measure as soon as the section is near; later size changes settle first
   useLayoutEffect(() => {
-    measure();
-  }, [measure, mode]);
+    if (near) measure();
+  }, [measure, mode, near]);
 
   useEffect(() => {
     const sec = sectionRef.current;

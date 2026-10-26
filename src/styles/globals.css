@@ -1134,13 +1134,13 @@ section[id] {
 /* ---- depth layers: one raster web, breathing, drift (compositor only) ---- */
 /* the section is its own island: nothing inside can force page-wide layout
    or paint, and far off-screen the browser skips it entirely */
-#real-me {
+#real-me:not(.skel) {
   contain: layout paint style;
   content-visibility: auto;
   contain-intrinsic-size: auto 900px;
 }
 @media (max-width: 767px) {
-  #real-me {
+  #real-me:not(.skel) {
     contain-intrinsic-size: auto 1100px;
   }
 }
@@ -1630,8 +1630,8 @@ section.realme--land {
 
 /* below-the-fold sections without fixed overlays or running scenes: the
    browser may skip their rendering work until they come near the viewport */
-#perspectives,
-#contact {
+#perspectives:not(.skel),
+#contact:not(.skel) {
   content-visibility: auto;
   contain-intrinsic-size: auto 1200px;
 }
@@ -1673,4 +1673,48 @@ html.lenis {
 [data-offscreen="true"] *::before,
 [data-offscreen="true"] *::after {
   animation-play-state: paused !important;
+}
+
+/* ---- section skeletons: the real heights, measured per breakpoint, so the
+   page height never jumps while sections arrive (DeferredSection) ---- */
+.skel {
+  width: 100%;
+}
+.skel-capabilities { min-height: max(100svh, 818px); }
+.skel-projects { min-height: 1540px; }
+.skel-experience { min-height: 758px; }
+.skel-real-me { min-height: 1100px; }
+.skel-perspectives { min-height: 836px; }
+.skel-contact { min-height: 1260px; }
+@media (min-width: 640px) {
+  .skel-perspectives { min-height: 1610px; }
+}
+@media (min-width: 768px) {
+  .skel-capabilities { min-height: max(calc(100svh + 40px), 820px); }
+  .skel-projects { min-height: 1590px; }
+  .skel-experience { min-height: 710px; }
+  .skel-real-me { min-height: 1290px; }
+  .skel-contact { min-height: 1460px; }
+}
+@media (min-width: 1024px) {
+  .skel-capabilities { min-height: calc(100svh + 390px); }
+  .skel-projects { min-height: 1394px; }
+  .skel-experience { min-height: 760px; }
+  .skel-real-me { min-height: calc(100svh - 72px); }
+  .skel-perspectives { min-height: 1400px; }
+  .skel-contact { min-height: 930px; }
+}
+@media (min-width: 1280px) {
+  .skel-projects { min-height: 1220px; }
+  .skel-experience { min-height: 785px; }
+  .skel-perspectives { min-height: 1260px; }
+  .skel-contact { min-height: 950px; }
+}
+@media (min-width: 1800px) {
+  .skel-projects { min-height: 1165px; }
+  .skel-perspectives { min-height: 1229px; }
+}
+/* landscape phones: The Real Me is exactly one screen */
+@media (orientation: landscape) and (max-height: 520px) and (min-height: 340px) {
+  .skel-real-me { min-height: 100svh; }
 }

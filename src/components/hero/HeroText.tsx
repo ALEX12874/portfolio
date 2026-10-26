@@ -1,3 +1,4 @@
+import { useContext } from "react";
 import { m } from "framer-motion";
 import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { site } from "../../data/site";
@@ -5,6 +6,7 @@ import { assets, RESUME_FILENAME } from "../../data/assets";
 import { scrollToSection } from "../../lib/scroll";
 import MagneticButton from "./MagneticButton";
 import SocialButton, { GitHubMark, LinkedInMark } from "./SocialButton";
+import { StaticRender, hadShell, syncedDelay } from "../../lib/shell";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -27,7 +29,8 @@ function withMarkers(text: string, keys: readonly string[]) {
     if (at < 0) return;
     if (at > cursor) nodes.push(text.slice(cursor, at));
     nodes.push(
-      <mark className="marker is-lit" key={k} style={{ animationDelay: `${900 + i * 140}ms` }}>
+      // in step with the static first screen's highlight, never replayed
+      <mark className="marker is-lit" key={k} style={{ animationDelay: syncedDelay(900 + i * 140) }}>
         {k}
       </mark>
     );
@@ -38,10 +41,13 @@ function withMarkers(text: string, keys: readonly string[]) {
 }
 
 export default function HeroText() {
+  // the first screen is already painted (static HTML, or the static copy
+  // React is taking over from): show the copy as it is, no entrance replay
+  const instant = useContext(StaticRender) || hadShell;
   return (
     <m.div
       variants={container}
-      initial="hidden"
+      initial={instant ? false : "hidden"}
       animate="show"
       className="hero-copy relative z-10 max-w-[46rem]"
     >

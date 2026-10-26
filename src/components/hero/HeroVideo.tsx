@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { StaticRender, releaseShell } from "../../lib/shell";
+import { whenSettled } from "../../lib/settle";
 import wideMp4 from "../../assets/hero/hero-wide.mp4";
 import wideWebm from "../../assets/hero/hero-wide.webm";
 import widePoster from "../../assets/hero/hero-wide.webp";
@@ -18,9 +20,12 @@ type Variant = keyof typeof SOURCES;
 type Fit = "contain" | "cover";
 
 /** Phone composition below 900px or in portrait; wide otherwise. */
+// a media query, not innerWidth: reading window sizes during render can
+// force a synchronous layout (this runs in React's very first render)
+const PHONE_QUERY = "(max-width: 899px), (orientation: portrait)";
 function pickVariant(): Variant {
-  if (typeof window === "undefined") return "wide";
-  return window.innerWidth < 900 || window.innerHeight > window.innerWidth ? "phone" : "wide";
+  if (typeof window === "undefined" || !window.matchMedia) return "wide";
+  return window.matchMedia(PHONE_QUERY).matches ? "phone" : "wide";
 }
 
 /* ------------------------------------------------------- billboard pop */
@@ -290,7 +295,39 @@ const ALT = "3D street scene: a large billboard reading IT'S ALL MARKETING. abov
  *
  * `still`: poster only (used while the live 3D scene warms up on top).
  */
-export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fit; still?: boolean }) {
+/**
+ * The static first screen (build time): the right poster for the screen,
+ * picked by the browser from media queries — no JavaScript needed.
+ */
+function StaticPoster({ fit }: { fit: Fit }) {
+  const media = `absolute inset-0 h-full w-full ${fit === "cover" ? "object-cover" : "object-contain"}`;
+  return (
+    <div className="relative h-full w-full" style={{ background: "#F5F0E8" }}>
+      <div role="img" aria-label={ALT} className="absolute inset-0">
+        <picture>
+          <source media="(max-width: 899px), (orientation: portrait)" srcSet={SOURCES.phone.poster} type="image/webp" />
+          <img
+            src={SOURCES.wide.poster}
+            alt=""
+            className={media}
+            style={{ objectPosition: "center bottom" }}
+            width={SOURCES.wide.width}
+            height={SOURCES.wide.height}
+            // React 18 only forwards the lowercase attribute
+            {...({ fetchpriority: "high" } as Record<string, string>)}
+            decoding="sync"
+          />
+        </picture>
+      </div>
+    </div>
+  );
+}
+
+export default function HeroVideo(props: { fit?: Fit; still?: boolean }) {
+  return useContext(StaticRender) ? <StaticPoster fit={props.fit ?? "contain"} /> : <LiveHeroVideo {...props} />;
+}
+
+function LiveHeroVideo({ fit = "contain", still = false }: { fit?: Fit; still?: boolean }) {
   const [variant, setVariant] = useState<Variant>(pickVariant);
   // attach the video only after the page has loaded, so its bytes never
   // compete with the poster (LCP) or the app's own scripts
@@ -309,16 +346,31 @@ export default function HeroVideo({ fit = "contain", still = false }: { fit?: Fi
     };
   }, []);
 
+  // the video bytes wait until the first screen is painted and the page is
+  // idle (≥ 1.5 s after load): they never compete with the poster or scripts
   useEffect(() => {
-    let t = 0;
-    const later = () => {
-      t = window.setTimeout(() => setAttach(true), 400);
-    };
-    if (document.readyState === "complete") later();
-    else window.addEventListener("load", later, { once: true });
+    let live = true;
+    void whenSettled().then(() => {
+      if (live) setAttach(true);
+    });
     return () => {
-      window.removeEventListener("load", later);
-      window.clearTimeout(t);
+      live = false;
+    };
+  }, []);
+
+  // take over from the static first screen once this poster is on screen
+  useEffect(() => {
+    let live = true;
+    const img = new Image();
+    img.src = SOURCES[pickVariant()].poster;
+    const done = () => {
+      if (!live) return;
+      // two frames: the poster has been painted under the static copy
+      requestAnimationFrame(() => requestAnimationFrame(() => releaseShell()));
+    };
+    (img.decode ? img.decode() : Promise.resolve()).then(done, done);
+    return () => {
+      live = false;
     };
   }, []);
 

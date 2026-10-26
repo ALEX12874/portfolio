@@ -1,4 +1,5 @@
 import { assets } from "../data/assets";
+import { load3d } from "./load3d";
 
 type IdleWindow = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
@@ -56,7 +57,9 @@ export function prefetchOnIdle(): () => void {
     const wide = window.matchMedia("(min-width: 768px)").matches;
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (wide && !calm) {
-      void import("../components/skills/SolarSystem").catch(() => undefined);
+      void load3d()
+        .then(() => import("../components/skills/SolarSystem"))
+        .catch(() => undefined);
     }
   });
 }

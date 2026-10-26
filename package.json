@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/generate-seo.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run build:shell",
+    "build:shell": "vite build --ssr src/shell/entry-shell.tsx --outDir node_modules/.cache/shell-ssr --emptyOutDir --logLevel warn && node scripts/prerender-shell.mjs",
     "typecheck": "tsc -b --force",
     "preview": "vite preview",
     "seo": "node scripts/generate-seo.mjs",
@@ -36,6 +37,7 @@
     "@types/three": "0.169.0",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
+    "beasties": "0.5.4",
     "ffmpeg-static": "^5.2.0",
     "playwright-core": "^1.48.2",
     "postcss": "8.4.49",

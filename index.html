@@ -74,19 +74,13 @@
       media="(min-width: 900px) and (orientation: landscape)"
       fetchpriority="high"
     />
-    <!-- the hero headline face (Archivo 900); fonts are self-hosted -->
+    <!-- only the hero headline face (Archivo 900) is preloaded; the others
+         swap in over size-matched fallbacks (tokens.css), so text never jumps -->
     <link
       rel="preload"
       as="font"
       type="font/woff2"
       href="/node_modules/@fontsource/archivo/files/archivo-latin-900-normal.woff2"
-      crossorigin
-    />
-    <link
-      rel="preload"
-      as="font"
-      type="font/woff2"
-      href="/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2"
       crossorigin
     />
   </head>

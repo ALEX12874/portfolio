@@ -2,14 +2,16 @@ import { lazy, useEffect } from "react";
 import { LazyMotion, domAnimation } from "framer-motion";
 import TopBar from "./components/layout/TopBar";
 import Hero from "./components/hero/Hero";
-import Capabilities from "./components/skills/Capabilities";
 import DeferredSection from "./components/layout/DeferredSection";
 import RetryBoundary from "./components/layout/RetryBoundary";
 import { prefetchOnIdle } from "./lib/prefetch";
 import { startSmoothScroll } from "./lib/smoothScroll";
 import { startOffscreenPause } from "./lib/offscreenPause";
+import { whenSettled } from "./lib/settle";
 
-// below the fold: separate chunks, rendered right after first paint
+// below the fold: separate chunks, loaded one at a time after first paint
+// (lib/sectionQueue), so the first screen never waits for them
+const Capabilities = lazy(() => import("./components/skills/Capabilities"));
 const ProjectsSection = lazy(() => import("./components/projects/ProjectsSection"));
 const ExperienceSection = lazy(() => import("./components/experience/ExperienceSection"));
 const RealMeSection = lazy(() => import("./components/realme/RealMeSection"));
@@ -21,8 +23,19 @@ const Footer = lazy(() => import("./components/layout/Footer"));
  * error boundary, so one failing part never blanks the page.
  */
 export default function App() {
-  // after first paint, on idle: project logos + (desktop/tablet) the 3D chunk
-  useEffect(() => prefetchOnIdle(), []);
+  // once the first screen is painted and the page is idle: project logos +
+  // (desktop/tablet) the solar-system chunk
+  useEffect(() => {
+    let cancel: (() => void) | null = null;
+    let live = true;
+    void whenSettled().then(() => {
+      if (live) cancel = prefetchOnIdle();
+    });
+    return () => {
+      live = false;
+      cancel?.();
+    };
+  }, []);
 
   // off-screen sections stop their CSS animations (no invisible repaints)
   useEffect(() => startOffscreenPause(), []);
@@ -51,28 +64,28 @@ export default function App() {
           <Hero />
         </RetryBoundary>
 
-        <RetryBoundary id="capabilities" label="capabilities" tone="ink" section>
+        <DeferredSection id="capabilities" order={1} tone="#151515" label="capabilities">
           <Capabilities />
-        </RetryBoundary>
+        </DeferredSection>
 
-        <DeferredSection id="projects" tone="#14342B" label="the projects">
+        <DeferredSection id="projects" order={2} tone="#14342B" label="the projects">
           <ProjectsSection />
         </DeferredSection>
 
-        <DeferredSection id="experience" tone="#151515" label="the experience">
+        <DeferredSection id="experience" order={3} tone="#151515" label="the experience">
           <ExperienceSection />
         </DeferredSection>
 
-        <DeferredSection id="real-me" tone="#EFE8DC" label="The Real Me">
+        <DeferredSection id="real-me" order={4} tone="#EFE8DC" label="The Real Me">
           <RealMeSection />
         </DeferredSection>
 
-        <DeferredSection id="perspectives" tone="#F5F0E8" label="the perspectives">
+        <DeferredSection id="perspectives" order={5} tone="#F5F0E8" label="the perspectives">
           <PerspectivesSection />
         </DeferredSection>
       </main>
 
-      <DeferredSection id="contact" tone="#151515" label="the contact section">
+      <DeferredSection id="contact" order={6} tone="#151515" label="the contact section">
         <Footer />
       </DeferredSection>
     </LazyMotion>

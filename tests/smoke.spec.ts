@@ -149,6 +149,49 @@ async function spiderSorts(page: Page) {
     .toBeGreaterThan(0);
 }
 
+/**
+ * The first impression: open the page and touch nothing. The static first
+ * screen paints, React takes over, sections arrive one at a time — and no
+ * main-thread task may block for more than 100 ms in the first 5 s.
+ */
+async function firstLoadIsSmooth(page: Page) {
+  const problems = watch(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as { __long: [number, number][] };
+    w.__long = [];
+    try {
+      new PerformanceObserver((list) =>
+        list.getEntries().forEach((e) => w.__long.push([Math.round(e.startTime), Math.round(e.duration)]))
+      ).observe({ type: "longtask", buffered: true });
+    } catch {
+      // no Long Tasks API: nothing to measure
+    }
+  });
+  await page.goto("/");
+  await page.waitForTimeout(5500);
+  const long = await page.evaluate(() => (window as unknown as { __long: [number, number][] }).__long);
+  const blocking = long.filter(([at, ms]) => at < 5000 && ms > 100);
+  expect(blocking, `long tasks in the first 5 s: ${JSON.stringify(long)}`).toEqual([]);
+  // the static first screen has handed over to the live page
+  await expect(page.locator("#shell")).toHaveCount(0);
+  const all = await allProblems(page, problems);
+  expect(all, all.join("\n")).toEqual([]);
+}
+
+test.describe("first load", () => {
+  test("desktop: no long task over 100 ms in the first 5 s", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await firstLoadIsSmooth(page);
+  });
+  test.describe("phone", () => {
+    const { defaultBrowserType: _ignored, ...iphone } = devices["iPhone 13"];
+    test.use(iphone);
+    test("phone: no long task over 100 ms in the first 5 s", async ({ page }) => {
+      await firstLoadIsSmooth(page);
+    });
+  });
+});
+
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 

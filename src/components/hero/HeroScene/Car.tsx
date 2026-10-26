@@ -1,8 +1,67 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { RoundedBox } from "@react-three/drei";
+import { toCreasedNormals } from "three-stdlib";
 import * as THREE from "three";
 import { loopRate, loopSpeed } from "./clock";
+
+/* ---------------------------------------------------------------- shapes */
+
+/**
+ * drei's <RoundedBox> rebuilds (and re-creases) its geometry for every
+ * instance: six cars × five boxes was ~50 ms of work in one go. Same maths
+ * here, but each distinct box is built once and shared.
+ */
+const EPS = 0.00001;
+const roundedCache = new Map<string, THREE.BufferGeometry>();
+
+function roundedShape(width: number, height: number, radius0: number) {
+  const shape = new THREE.Shape();
+  const radius = radius0 - EPS;
+  shape.absarc(EPS, EPS, EPS, -Math.PI / 2, -Math.PI, true);
+  shape.absarc(EPS, height - radius * 2, EPS, Math.PI, Math.PI / 2, true);
+  shape.absarc(width - radius * 2, height - radius * 2, EPS, Math.PI / 2, 0, true);
+  shape.absarc(width - radius * 2, EPS, EPS, 0, -Math.PI / 2, true);
+  return shape;
+}
+
+function roundedBoxGeometry(w: number, h: number, d: number, radius: number, smoothness: number) {
+  const key = `${w},${h},${d},${radius},${smoothness}`;
+  let geo = roundedCache.get(key);
+  if (!geo) {
+    geo = new THREE.ExtrudeGeometry(roundedShape(w, h, radius), {
+      depth: d - radius * 2,
+      bevelEnabled: true,
+      bevelSegments: 8,
+      steps: 1,
+      bevelSize: radius - EPS,
+      bevelThickness: radius,
+      curveSegments: smoothness,
+    });
+    geo.center();
+    toCreasedNormals(geo, 0.4);
+    roundedCache.set(key, geo);
+  }
+  return geo;
+}
+
+type MeshProps = Omit<React.ComponentProps<"mesh">, "args">;
+
+function RoundedBox({
+  args: [w, h, d],
+  radius,
+  smoothness,
+  children,
+  ...rest
+}: MeshProps & { args: [number, number, number]; radius: number; smoothness: number }) {
+  const geometry = useMemo(() => roundedBoxGeometry(w, h, d, radius, smoothness), [w, h, d, radius, smoothness]);
+  // shared geometry: never disposed with one car
+  return (
+    <mesh geometry={geometry} dispose={null} {...rest}>
+      {children}
+    </mesh>
+  );
+}
+
 
 const Z_NEAR = 16;
 const Z_FAR = -46;

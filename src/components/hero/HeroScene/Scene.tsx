@@ -137,17 +137,150 @@ function FrameGuard({ onSlow }: { onSlow: () => boolean }) {
 }
 
 /**
- * Pre-compiles every shader while the poster still covers the stage, then
- * reports ready after a few rendered frames, so the crossfade never janks.
+ * Builds the scene a piece per frame while the poster still covers the
+ * stage (each piece is a short task instead of one long freeze).
  */
-function Warmup({ onReady }: { onReady?: () => void }) {
+function Stager({ stage, total, next }: { stage: number; total: number; next: () => void }) {
+  useEffect(() => {
+    if (stage >= total) return undefined;
+    let t = 0;
+    const raf = requestAnimationFrame(() => {
+      t = window.setTimeout(next, 0);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
+  }, [stage, total, next]);
+  return null;
+}
+
+interface ProgramLike {
+  isReady: () => boolean;
+  getUniforms: () => unknown;
+}
+
+/**
+ * Prepares every shader before the first frame, without one long freeze:
+ * 1. starts compiling all programs (they compile in parallel on the GPU,
+ *    KHR_parallel_shader_compile);
+ * 2. waits — without blocking — until they are linked;
+ * 3. reads each program's uniforms (a burst of synchronous GPU queries per
+ *    program, the part that used to freeze the first frame) in ~10 ms slices.
+ * Mounted inside the scene's Suspense boundary, so textures are in by then.
+ */
+function Compile({ onCompiled }: { onCompiled: () => void }) {
   const { gl, scene, camera } = useThree();
   useEffect(() => {
+    let live = true;
+    let t = 0;
+    const done = () => {
+      if (live) onCompiled();
+    };
+    let programs: ProgramLike[] = [];
     try {
-      gl.compile(scene, camera);
+      const materials = gl.compile(scene, camera) as unknown as Set<THREE.Material>;
+      const seen = new Set<ProgramLike>();
+      materials.forEach((m) => {
+        const p = (gl.properties.get(m) as { currentProgram?: ProgramLike }).currentProgram;
+        if (p && !seen.has(p)) seen.add(p);
+      });
+      programs = [...seen];
     } catch {
-      // compile is an optimisation only
+      done(); // preparing ahead is an optimisation only
+      return undefined;
     }
+    const parallel = !!gl.extensions.get("KHR_parallel_shader_compile");
+    const readUniforms = () => {
+      if (!live) return;
+      const start = performance.now();
+      while (programs.length && performance.now() - start < 10) {
+        try {
+          programs.shift()?.getUniforms();
+        } catch {
+          // a failing program shows up (and is reported) on first render
+        }
+      }
+      if (programs.length) t = window.setTimeout(readUniforms, 0);
+      else done();
+    };
+    const waitLinked = () => {
+      if (!live) return;
+      if (!parallel || programs.every((p) => p.isReady())) readUniforms();
+      else t = window.setTimeout(waitLinked, 16);
+    };
+    waitLinked();
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [gl, scene, camera, onCompiled]);
+  return null;
+}
+
+/**
+ * The very first frame uploads every mesh to the GPU. Instead of one long
+ * frame, the meshes are revealed and drawn a group at a time (one per frame),
+ * still invisible under the poster; then the render loop takes over.
+ */
+function Upload({ groups, onDone }: { groups: React.MutableRefObject<(THREE.Group | null)[]>; onDone: () => void }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    // hide meshes only — never lights: a change in the lights would need new
+    // shader variants and undo the compiling done ahead
+    const list = groups.current
+      .filter((g): g is THREE.Group => !!g)
+      .map((g) => {
+        const meshes: { obj: THREE.Object3D; was: boolean }[] = [];
+        g.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints || (o as THREE.Line).isLine) {
+            meshes.push({ obj: o, was: o.visible });
+            o.visible = false;
+          }
+        });
+        return meshes;
+      });
+    let i = 0;
+    let raf = 0;
+    let t = 0;
+    let live = true;
+    const step = () => {
+      if (!live) return;
+      if (i >= list.length) {
+        onDone();
+        return;
+      }
+      list[i].forEach((m) => {
+        m.obj.visible = m.was;
+      });
+      i += 1;
+      try {
+        gl.render(scene, camera);
+      } catch {
+        // drawing ahead is an optimisation only
+      }
+      raf = requestAnimationFrame(() => {
+        t = window.setTimeout(step, 0);
+      });
+    };
+    step();
+    return () => {
+      live = false;
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+      list.flat().forEach((m) => {
+        m.obj.visible = m.was;
+      });
+    };
+    // runs once, after compiling; the groups are final by then
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl, scene, camera]);
+  return null;
+}
+
+/** Reports ready after a few rendered frames, so the crossfade never janks. */
+function Warmup({ onReady }: { onReady?: () => void }) {
+  useEffect(() => {
     let frames = 0;
     let raf = 0;
     const tick = () => {
@@ -157,7 +290,7 @@ function Warmup({ onReady }: { onReady?: () => void }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [gl, scene, camera, onReady]);
+  }, [onReady]);
   return null;
 }
 
@@ -213,13 +346,30 @@ export default function Scene({ active, parallax, tier = "high", onLowFps, onRea
 
   const crowd = quality.crowd === "full" ? pedestrians : pedestrians.filter((_, i) => i % 2 === 0);
 
+  // built in steps: ground + skyline, cars, the crowd four at a time, the board
+  const crowdSteps = Math.ceil(crowd.length / 4);
+  const total = 3 + crowdSteps;
+  const [stage, setStage] = useState(CAPTURE ? 99 : 0);
+  const nextStage = useCallback(() => setStage((n) => n + 1), []);
+  const [compiled, setCompiled] = useState(CAPTURE);
+  const onCompiled = useCallback(() => setCompiled(true), []);
+  const [uploaded, setUploaded] = useState(CAPTURE);
+  const onUploaded = useCallback(() => setUploaded(true), []);
+  const crowdChunks = Array.from({ length: crowdSteps }, (_, c) => crowd.slice(c * 4, c * 4 + 4));
+  // one group per build step, revealed one per frame on the first upload
+  const groups = useRef<(THREE.Group | null)[]>([]);
+  const setGroup = (k: number) => (g: THREE.Group | null) => {
+    groups.current[k] = g;
+  };
+
   return (
     <Canvas
       shadows
       // R3F sets pointer-events on its own wrapper, so the switch lives here
       style={{ pointerEvents: interactive ? "auto" : "none" }}
       dpr={CAPTURE ? 1 : [1, quality.dpr]}
-      frameloop={CAPTURE ? "never" : active ? "always" : "never"}
+      // the render loop starts once the scene has been uploaded piece by piece
+      frameloop={CAPTURE ? "never" : active && uploaded ? "always" : "never"}
       gl={{
         antialias: true,
         alpha: true,
@@ -278,22 +428,47 @@ export default function Scene({ active, parallax, tier = "high", onLowFps, onRea
       {/* rim from behind the board: separates crowd + skyline from the haze */}
       <directionalLight position={[-8, 7, -20]} intensity={0.6} color="#F5F0E8" />
 
+      {CAPTURE ? null : <Stager stage={stage} total={total} next={nextStage} />}
       <Suspense fallback={null}>
         <Rig enabled={parallax && !CAPTURE}>
           <group rotation-y={0.36} position={[5, 0, -2]}>
-            <Road />
-            <Footpath />
-            <Environment />
-            {CARS.map((c, i) => (
-              <Car key={i} {...c} />
-            ))}
-            {crowd.map((p) => (
-              <Pedestrian key={p.id} cfg={p} />
-            ))}
-            <Billboard />
+            {stage >= 1 ? (
+              <group ref={setGroup(0)}>
+                <Road />
+                <Footpath />
+                <Environment />
+              </group>
+            ) : null}
+            {stage >= 2 ? (
+              <group ref={setGroup(1)}>
+                {CARS.map((c, i) => (
+                  <Car key={i} {...c} />
+                ))}
+              </group>
+            ) : null}
+            {crowdChunks.map((chunk, c) =>
+              stage >= 3 + c ? (
+                <group key={c} ref={setGroup(2 + c)}>
+                  {chunk.map((p) => (
+                    <Pedestrian key={p.id} cfg={p} />
+                  ))}
+                </group>
+              ) : null
+            )}
+            {stage >= total ? (
+              <group ref={setGroup(2 + crowdSteps)}>
+                <Billboard />
+              </group>
+            ) : null}
           </group>
         </Rig>
-        {CAPTURE ? null : <Warmup onReady={onReady} />}
+        {CAPTURE || stage < total ? null : !compiled ? (
+          <Compile onCompiled={onCompiled} />
+        ) : !uploaded ? (
+          <Upload groups={groups} onDone={onUploaded} />
+        ) : (
+          <Warmup onReady={onReady} />
+        )}
       </Suspense>
     </Canvas>
   );

@@ -18,6 +18,7 @@ const candidates =
 const browserPath = process.env.CHROME_PATH || candidates.find((p) => existsSync(p)) || candidates[0];
 
 const out = "node_modules/.cache/contact-test";
+const ssrOut = "node_modules/.cache/contact-test-shell";
 const vite = `"${process.execPath}" node_modules/vite/bin/vite.js`;
 
 export default defineConfig({
@@ -30,7 +31,8 @@ export default defineConfig({
     launchOptions: { executablePath: browserPath },
   },
   webServer: {
-    command: `${vite} build --outDir ${out} --emptyOutDir && ${vite} preview --outDir ${out} --port 4321 --strictPort --host 127.0.0.1`,
+    // same pipeline as production: app build + static first screen + critical CSS
+    command: `${vite} build --outDir ${out} --emptyOutDir && ${vite} build --ssr src/shell/entry-shell.tsx --outDir ${ssrOut} --emptyOutDir --logLevel warn && "${process.execPath}" scripts/prerender-shell.mjs ${out} ${ssrOut} && ${vite} preview --outDir ${out} --port 4321 --strictPort --host 127.0.0.1`,
     url: "http://127.0.0.1:4321",
     timeout: 180_000,
     reuseExistingServer: false,
