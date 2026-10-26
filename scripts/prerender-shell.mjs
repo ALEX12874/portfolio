@@ -66,6 +66,25 @@ if (cssHref) {
   const missing = faces.filter((f) => !final.includes(f));
   if (missing.length) final = final.replace("<style>", `<style>${missing.join("")}`);
 }
+// the hero poster gets the bandwidth first: the app's JavaScript (which the
+// static first screen doesn't need) starts downloading once the poster has
+// loaded — 2.5 s at the latest — with its chunks fetched in parallel
+const mainScript = /<script type="module" crossorigin src="([^"]+)"><\/script>\s*/.exec(final);
+if (!mainScript) throw new Error("prerender-shell: app module script not found");
+const preloads = [...final.matchAll(/<link rel="modulepreload" crossorigin href="([^"]+)">\s*/g)];
+final = final.replace(mainScript[0], "");
+preloads.forEach((m) => {
+  final = final.replace(m[0], "");
+});
+const loader =
+  "<script>(function(){var d=document,done=0;function go(){if(done)return;done=1;" +
+  JSON.stringify(preloads.map((m) => m[1])) +
+  '.forEach(function(h){var l=d.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;d.head.appendChild(l)});' +
+  'var s=d.createElement("script");s.type="module";s.crossOrigin="";s.src=' +
+  JSON.stringify(mainScript[1]) +
+  ';d.head.appendChild(s)}var i=d.querySelector("#shell img");if(!i||i.complete)go();else{i.addEventListener("load",go);i.addEventListener("error",go)}setTimeout(go,2500)})()</script>';
+final = final.replace("</body>", `    ${loader}\n  </body>`);
+
 writeFileSync(file, final);
 const inlined = (final.match(/<style[^>]*>([\s\S]*?)<\/style>/g) || []).reduce((n, b) => n + b.length, 0);
 console.log(
