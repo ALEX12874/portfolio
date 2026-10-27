@@ -23,6 +23,8 @@ const vite = `"${process.execPath}" node_modules/vite/bin/vite.js`;
 
 export default defineConfig({
   testDir: "tests",
+  // unit tests and the live delivery check have their own configs
+  testIgnore: ["**/unit/**", "**/live/**"],
   timeout: 90_000,
   fullyParallel: true,
   reporter: [["list"]],

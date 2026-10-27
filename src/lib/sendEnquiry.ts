@@ -1,35 +1,35 @@
 /**
- * Contact-form delivery. The UI only ever calls `sendEnquiry()`; to move to
- * a serverless route later, change the provider functions below and leave
- * the form untouched.
+ * Contact-form delivery. The UI only ever calls `sendEnquiry()`.
  *
- * 1. Primary — FormSubmit (no API key): POST JSON to `site.contactEndpoint`.
- *    The first ever submission makes FormSubmit email the inbox an
- *    "Activate Form" link; until it's clicked, replies say activation is
- *    needed (reported as reason "pending").
- * 2. Backup — Web3Forms, only when VITE_WEB3FORMS_KEY is set at build time.
+ * The form posts to our own `/api/contact` (same origin, so ad blockers and
+ * privacy tools that block third-party form services can't stop it). The
+ * server validates the enquiry and emails it (Resend, with a backup) — see
+ * server/contact.ts. No key is ever in the browser.
  *
- * Each request: 12 s timeout, one automatic retry after 1.5 s on network
- * errors / 5xx / timeouts, then the next provider. Never throws.
+ * 15 s timeout, one automatic retry on a network error / timeout / 5xx.
+ * Never throws, so the UI can never get stuck.
  */
-import { site } from "../data/site";
 
 export interface Enquiry {
   name: string;
   phone: string;
   email: string;
   message: string;
-  /** Honeypot — real users never tick it. */
-  botcheck?: boolean;
+  /** Honeypot — a hidden field real visitors never fill in. */
+  website?: string;
 }
 
-export type FailReason = "offline" | "timeout" | "rejected" | "network" | "pending";
+export type Field = "name" | "phone" | "email" | "message";
 
-export type SendResult = { ok: true } | { ok: false; reason: FailReason; detail?: string };
+export type FailReason = "offline" | "timeout" | "network" | "failed" | "invalid" | "limited";
 
-const WEB3FORMS_URL = "https://api.web3forms.com/submit";
-const TIMEOUT_MS = 12000;
-const RETRY_DELAY_MS = 1500;
+export type SendResult =
+  | { ok: true; id?: string }
+  | { ok: false; reason: FailReason; field?: Field; detail?: string };
+
+export const CONTACT_ENDPOINT = "/api/contact";
+const TIMEOUT_MS = 15000;
+const RETRY_DELAY_MS = 1200;
 
 export const LIMITS = {
   name: 80,
@@ -46,42 +46,50 @@ export function clean(value: string, max: number, multiline = false): string {
   return stripped.trim().slice(0, max);
 }
 
-function sanitize(e: Enquiry): Enquiry {
+function sanitize(e: Enquiry): Required<Enquiry> {
   return {
     name: clean(e.name, LIMITS.name),
     phone: clean(e.phone, LIMITS.phone),
     email: clean(e.email, LIMITS.email).toLowerCase(),
     message: clean(e.message, LIMITS.message, true),
-    botcheck: !!e.botcheck,
+    website: clean(e.website ?? "", 200),
   };
 }
 
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 const isOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+const FIELDS: Field[] = ["name", "phone", "email", "message"];
 
 interface Attempt {
   result: SendResult;
-  /** Worth one automatic retry (network error / 5xx / timeout). */
+  /** Worth one automatic retry (network error / timeout / 5xx). */
   retryable: boolean;
 }
 
-type Judge = (data: Record<string, unknown> | null, res: Response) => SendResult;
-
-/** One JSON POST with a hard timeout; never throws. */
-async function postJson(url: string, body: unknown, judge: Judge): Promise<Attempt> {
+/** One POST to /api/contact with a hard timeout; never throws. */
+async function postOnce(body: Required<Enquiry>): Promise<Attempt> {
   if (isOffline()) return { result: { ok: false, reason: "offline" }, retryable: false };
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    const res = await fetch(CONTACT_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-    const result = judge(data, res);
-    return { result, retryable: !result.ok && res.status >= 500 };
+    if (res.ok && data?.ok === true) {
+      return { result: { ok: true, id: typeof data.id === "string" ? data.id : undefined }, retryable: false };
+    }
+    if (res.status === 400 && typeof data?.field === "string" && FIELDS.includes(data.field as Field)) {
+      return {
+        result: { ok: false, reason: "invalid", field: data.field as Field, detail: String(data.error ?? "") },
+        retryable: false,
+      };
+    }
+    if (res.status === 429) return { result: { ok: false, reason: "limited" }, retryable: false };
+    return { result: { ok: false, reason: "failed", detail: `HTTP ${res.status}` }, retryable: res.status >= 500 };
   } catch (err) {
     if (isOffline()) return { result: { ok: false, reason: "offline" }, retryable: false };
     const aborted = err instanceof DOMException && err.name === "AbortError";
@@ -91,89 +99,14 @@ async function postJson(url: string, body: unknown, judge: Judge): Promise<Attem
   }
 }
 
-/** Run an attempt, retrying once (after 1.5 s) on network errors / 5xx / timeouts. */
-async function withRetry(run: () => Promise<Attempt>): Promise<SendResult> {
-  const first = await run();
-  if (first.result.ok || !first.retryable) return first.result;
-  await wait(RETRY_DELAY_MS);
-  return (await run()).result;
-}
-
-const messageOf = (data: Record<string, unknown> | null, res: Response) =>
-  typeof data?.message === "string" ? data.message : `HTTP ${res.status}`;
-
-/** FormSubmit: sent only when `success` is true or "true". */
-function postFormSubmit(e: Enquiry): Promise<SendResult> {
-  return withRetry(() =>
-    postJson(
-      site.contactEndpoint,
-      {
-        name: e.name,
-        email: e.email,
-        phone: e.phone,
-        message: e.message,
-        _subject: `New portfolio enquiry from ${e.name}`,
-        _replyto: e.email,
-        _template: "table",
-        _captcha: "false",
-        _honey: "",
-      },
-      (data, res) => {
-        const success = data?.success === true || data?.success === "true";
-        if (res.ok && success) return { ok: true };
-        const message = messageOf(data, res);
-        // first-ever submission: FormSubmit asks the owner to activate the form
-        if (/activat|confirm/i.test(message)) return { ok: false, reason: "pending", detail: message };
-        return { ok: false, reason: "rejected", detail: message };
-      }
-    )
-  );
-}
-
-/** Web3Forms backup: success only when data.success === true. */
-function postWeb3Forms(key: string, e: Enquiry): Promise<SendResult> {
-  return withRetry(() =>
-    postJson(
-      WEB3FORMS_URL,
-      {
-        access_key: key,
-        subject: `New portfolio enquiry from ${e.name}`,
-        from_name: "Portfolio Website",
-        name: e.name,
-        email: e.email,
-        phone: e.phone,
-        replyto: e.email,
-        message: e.message,
-        botcheck: false,
-      },
-      (data, res) =>
-        res.ok && data?.success === true
-          ? { ok: true }
-          : { ok: false, reason: "rejected", detail: messageOf(data, res) }
-    )
-  );
-}
-
-/**
- * Send one enquiry: FormSubmit first, then Web3Forms (if a key was built in).
- * A ticked honeypot short-circuits to a silent "success" so bots learn
- * nothing. Always resolves, so the UI can never get stuck.
- */
+/** Send one enquiry (one automatic retry). Always resolves. */
 export async function sendEnquiry(input: Enquiry): Promise<SendResult> {
-  const e = sanitize(input);
-  if (e.botcheck) return { ok: true };
-
   try {
-    const primary = await postFormSubmit(e);
-    if (primary.ok || primary.reason === "offline") return primary;
-
-    const key = (import.meta.env.VITE_WEB3FORMS_KEY || "").trim();
-    if (key) {
-      const backup = await postWeb3Forms(key, e);
-      if (backup.ok) return backup;
-    }
-    // keep the primary's reason: it explains the situation best
-    return primary;
+    const body = sanitize(input);
+    const first = await postOnce(body);
+    if (first.result.ok || !first.retryable) return first.result;
+    await wait(RETRY_DELAY_MS);
+    return (await postOnce(body)).result;
   } catch {
     return { ok: false, reason: "network" };
   }

@@ -64,8 +64,10 @@ function writeLastSent(t: number) {
 /**
  * "Send a message" card. Real <form noValidate> with visible labels, inline
  * errors (aria-describedby / aria-invalid), focus on the first invalid field,
- * honeypot + minimum fill time + 30 s cooldown. Delivery is delegated to
- * sendEnquiry(), so the transport can change without touching this UI.
+ * a hidden honeypot field + a short cooldown after a send. Delivery is
+ * delegated to sendEnquiry() (our own /api/contact), so the transport can
+ * change without touching this UI. Server-side field errors land on the
+ * matching field; typed text is never lost.
  */
 export default function ContactForm({ email }: ContactFormProps) {
   const uid = useId();
@@ -144,7 +146,7 @@ export default function ContactForm({ email }: ContactFormProps) {
 
     setNotice("");
     setStatus("sending");
-    const result = await sendEnquiry({ ...values, botcheck: !!honeypot.current?.checked });
+    const result = await sendEnquiry({ ...values, website: honeypot.current?.value ?? "" });
     if (result.ok) {
       const sent = Date.now();
       writeLastSent(sent);
@@ -152,6 +154,12 @@ export default function ContactForm({ email }: ContactFormProps) {
       setNow(sent);
       setSentName(values.name.trim().split(/\s+/)[0] ?? "");
       setStatus("success");
+    } else if (result.reason === "invalid" && result.field) {
+      // the server disagreed with a field: show it inline, keep everything typed
+      const field = result.field;
+      setErrors((cur) => ({ ...cur, [field]: result.detail || "Please check this field." }));
+      setStatus("idle");
+      window.setTimeout(() => fields.current[field]?.focus(), 0);
     } else {
       setFailReason(result.reason);
       setFailDetail(result.detail ?? "");
@@ -171,11 +179,13 @@ export default function ContactForm({ email }: ContactFormProps) {
 
   const failCopy: Record<FailReason, string> = {
     offline: "You seem to be offline, so I couldn't send it.",
-    timeout: "Couldn't send — the mail service took too long to answer.",
-    rejected: `Couldn't send automatically — the mail service said: ${failDetail || "request rejected"}.`,
-    network: "Couldn't send automatically — the connection to the mail service failed.",
-    pending: "Couldn't send automatically — the form is waiting to be activated.",
+    timeout: "Couldn't send automatically — the mail service took too long to answer.",
+    network: "Couldn't send automatically — the connection failed.",
+    failed: "Couldn't send automatically.",
+    invalid: "Couldn't send automatically — please check the highlighted field.",
+    limited: "Couldn't send automatically — too many messages in a short time. Please try again in a few minutes.",
   };
+  void failDetail;
 
   const sendAnother = () => {
     setValues(EMPTY);
@@ -251,8 +261,8 @@ export default function ContactForm({ email }: ContactFormProps) {
 
             {/* honeypot: off-screen, out of the tab order, hidden from AT */}
             <div aria-hidden="true" className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden">
-              <label htmlFor={`${uid}-botcheck`}>Leave this box unticked</label>
-              <input ref={honeypot} id={`${uid}-botcheck`} type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off" />
+              <label htmlFor={`${uid}-website`}>Leave this field empty</label>
+              <input ref={honeypot} id={`${uid}-website`} type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
             </div>
 
             <div>
