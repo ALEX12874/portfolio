@@ -6,15 +6,14 @@ import SkillPanel from "./SkillPanel";
 import RetryBoundary from "../layout/RetryBoundary";
 import { sectionHeadings } from "../../data/site";
 import { useNearViewport } from "../../hooks/useInView";
-import { load3d } from "../../lib/load3d";
-import { useSettled, whenSecondSceneMayStart } from "../../lib/settle";
 import { useSceneTurn } from "../../lib/sceneArbiter";
+import { load3d } from "../../lib/load3d";
 
-const NEAR_MARGIN =
-  typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? "150px" : "600px";
-
-// 3D is lazy-loaded so three.js stays out of the first paint
-const SolarSystem = lazy(() => load3d().then(() => import("./SolarSystem")));
+// 3D is a separate chunk (three.js stays out of the first paint). It starts
+// downloading as soon as this section mounts — right after the page has
+// loaded — so the orbit is ready by the time it comes into view.
+const loadSolarSystem = () => load3d().then(() => import("./SolarSystem"));
+const SolarSystem = lazy(loadSolarSystem);
 
 /**
  * 02 / CAPABILITIES — "The orbit of ideas".
@@ -27,15 +26,14 @@ export default function Capabilities() {
   // one WebGL scene at a time: the orbit renders only while it is the most
   // visible 3D scene (the live hero pauses meanwhile, and vice versa)
   const { ref, active } = useSceneTurn<HTMLElement>("solar");
-  // three.js is only fetched once the orbit is close: ~600px ahead on
-  // desktop, ~150px on phones (where the hero is short, 600px would start
-  // the heavy 3D parse while the page is still loading)
-  const { ref: nearRef, near: nearView } = useNearViewport<HTMLDivElement>(NEAR_MARGIN);
-  // never before the first screen is painted and the page is idle, never
-  // while the hero's 3D scene is building, never in the first 5 s
-  const settled = useSettled(true, whenSecondSceneMayStart);
-  const near = nearView && settled;
+  // the orbit renders once it is within ~600px of the screen
+  const { ref: nearRef, near } = useNearViewport<HTMLDivElement>("600px");
   const copy = sectionHeadings.capabilities;
+
+  // start fetching the orbit right away (it is just below the hero)
+  useEffect(() => {
+    void loadSolarSystem().catch(() => undefined);
+  }, []);
 
   // Esc clears the selection
   useEffect(() => {

@@ -1,5 +1,4 @@
 import { assets } from "../data/assets";
-import { load3d } from "./load3d";
 
 type IdleWindow = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
@@ -45,21 +44,7 @@ export function decodedOrTimeout(src: string, ms = 160): Promise<void> {
   return Promise.race([decodeImage(src), new Promise<void>((r) => window.setTimeout(r, ms))]);
 }
 
-/**
- * After first paint, on idle: warm the project logos and, where live 3D is
- * allowed (desktop / tablet, full motion), the solar-system chunk (three /
- * drei) so it is parsed before the visitor scrolls to it. Phones never pay
- * for three.js up front.
- */
+/** After first paint, on idle: warm the project logos. */
 export function prefetchOnIdle(): () => void {
-  return whenIdle(() => {
-    preloadProjectLogos();
-    const wide = window.matchMedia("(min-width: 768px)").matches;
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (wide && !calm) {
-      void load3d()
-        .then(() => import("../components/skills/SolarSystem"))
-        .catch(() => undefined);
-    }
-  });
+  return whenIdle(preloadProjectLogos);
 }

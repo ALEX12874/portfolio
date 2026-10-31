@@ -30,8 +30,18 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:4321",
-    launchOptions: { executablePath: browserPath },
+    // the real GPU, as visitors have (headless Chrome otherwise draws WebGL in
+    // software, many times slower than any real device)
+    launchOptions: {
+      executablePath: browserPath,
+      args: [...(process.platform === "win32" ? ["--use-angle=d3d11"] : []), "--enable-gpu", "--ignore-gpu-blocklist"],
+    },
   },
+  projects: [
+    // timing-sensitive: on their own, before the heavy tours start
+    { name: "first-load", grep: /first load/, fullyParallel: false },
+    { name: "main", grepInvert: /first load/, dependencies: ["first-load"] },
+  ],
   webServer: {
     // same pipeline as production: app build + static first screen + critical CSS
     command: `${vite} build --outDir ${out} --emptyOutDir && ${vite} build --ssr src/shell/entry-shell.tsx --outDir ${ssrOut} --emptyOutDir --logLevel warn && "${process.execPath}" scripts/prerender-shell.mjs ${out} ${ssrOut} && ${vite} preview --outDir ${out} --port 4321 --strictPort --host 127.0.0.1`,

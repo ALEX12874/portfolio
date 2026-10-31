@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
@@ -12,6 +12,7 @@ import { PLANET_LAYOUT } from "./planets";
 import { skills } from "../../data/skills";
 import { useWebGLSupport } from "../../hooks/useWebGLSupport";
 import { useMotionLevel } from "../../hooks/useMotionLevel";
+import { PrepareShaders, glDebug } from "../three/PrepareShaders";
 
 interface SolarSystemProps {
   selectedId: string | null;
@@ -99,6 +100,9 @@ export default function SolarSystem({
   active,
 }: SolarSystemProps) {
   const webgl = useWebGLSupport();
+  // the render loop starts once every shader is prepared (no first-frame freeze)
+  const [ready, setReady] = useState(false);
+  const onReady = useCallback(() => setReady(true), []);
   // calm motion: same living system, orbits at half speed
   const calm = useMotionLevel() === "calm";
 
@@ -112,15 +116,16 @@ export default function SolarSystem({
     <div
       className="relative h-full w-full"
       style={{ touchAction: "pan-y" }}
+      data-ready={ready || undefined}
       role="group"
       aria-label="Interactive orbit diagram of marketing skills"
     >
       <SceneErrorBoundary fallback={fallback}>
         <Canvas
           dpr={[1, DPR_CAP]}
-          frameloop={active ? "always" : "never"}
+          frameloop={active && ready ? "always" : "never"}
           camera={{ position: [0, 9, 26], fov: 34, near: 0.1, far: 200 }}
-          gl={{ antialias: true, alpha: true }}
+          gl={{ antialias: true, alpha: true, debug: glDebug }}
           onPointerMissed={() => onSelect(null)}
         >
           <ambientLight intensity={0.07} color="#F5F0E8" />
@@ -159,6 +164,7 @@ export default function SolarSystem({
                 onSelect={onSelect}
               />
             ))}
+            {ready ? null : <PrepareShaders onReady={onReady} />}
           </Suspense>
 
           <CameraControls enabled />

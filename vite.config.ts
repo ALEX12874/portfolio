@@ -85,11 +85,13 @@ export default defineConfig(({ mode }) => {
     build: {
       target: "es2020",
       chunkSizeWarningLimit: 1600,
+      // read by scripts/prerender-shell.mjs (to preload the orbit), then deleted
+      manifest: true,
       rollupOptions: {
         output: {
           // vendor chunks: React + framer-motion load with the shell; three
           // and fiber are separate chunks that only lazy code imports (loaded
-          // in idle-time steps, lib/load3d); drei members and pdf.js stay in
+          // in steps, lib/load3d); drei members and pdf.js stay in
           // their own lazy chunks
           manualChunks(id) {
             if (!id.includes("node_modules")) return undefined;

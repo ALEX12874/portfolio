@@ -9,6 +9,7 @@ import Pedestrian, { pedestrians } from "./Pedestrian";
 import Environment from "./Environment";
 import Rig from "./Rig";
 import { CAPTURE, CAPTURE_VARIANT } from "./clock";
+import { PrepareShaders, glDebug } from "../../three/PrepareShaders";
 
 /**
  * Quality tier: "high" on landscape screens ≥ 900 px; "low" on tablets
@@ -152,69 +153,6 @@ function Stager({ stage, total, next }: { stage: number; total: number; next: ()
       window.clearTimeout(t);
     };
   }, [stage, total, next]);
-  return null;
-}
-
-interface ProgramLike {
-  isReady: () => boolean;
-  getUniforms: () => unknown;
-}
-
-/**
- * Prepares every shader before the first frame, without one long freeze:
- * 1. starts compiling all programs (they compile in parallel on the GPU,
- *    KHR_parallel_shader_compile);
- * 2. waits — without blocking — until they are linked;
- * 3. reads each program's uniforms (a burst of synchronous GPU queries per
- *    program, the part that used to freeze the first frame) in ~10 ms slices.
- * Mounted inside the scene's Suspense boundary, so textures are in by then.
- */
-function Compile({ onCompiled }: { onCompiled: () => void }) {
-  const { gl, scene, camera } = useThree();
-  useEffect(() => {
-    let live = true;
-    let t = 0;
-    const done = () => {
-      if (live) onCompiled();
-    };
-    let programs: ProgramLike[] = [];
-    try {
-      const materials = gl.compile(scene, camera) as unknown as Set<THREE.Material>;
-      const seen = new Set<ProgramLike>();
-      materials.forEach((m) => {
-        const p = (gl.properties.get(m) as { currentProgram?: ProgramLike }).currentProgram;
-        if (p && !seen.has(p)) seen.add(p);
-      });
-      programs = [...seen];
-    } catch {
-      done(); // preparing ahead is an optimisation only
-      return undefined;
-    }
-    const parallel = !!gl.extensions.get("KHR_parallel_shader_compile");
-    const readUniforms = () => {
-      if (!live) return;
-      const start = performance.now();
-      while (programs.length && performance.now() - start < 10) {
-        try {
-          programs.shift()?.getUniforms();
-        } catch {
-          // a failing program shows up (and is reported) on first render
-        }
-      }
-      if (programs.length) t = window.setTimeout(readUniforms, 0);
-      else done();
-    };
-    const waitLinked = () => {
-      if (!live) return;
-      if (!parallel || programs.every((p) => p.isReady())) readUniforms();
-      else t = window.setTimeout(waitLinked, 16);
-    };
-    waitLinked();
-    return () => {
-      live = false;
-      window.clearTimeout(t);
-    };
-  }, [gl, scene, camera, onCompiled]);
   return null;
 }
 
@@ -375,6 +313,7 @@ export default function Scene({ active, parallax, tier = "high", onLowFps, onRea
         alpha: true,
         powerPreference: "high-performance",
         preserveDrawingBuffer: CAPTURE,
+        debug: glDebug,
       }}
       camera={{ position: framing.position, fov: framing.fov, near: 0.1, far: 260 }}
       onCreated={({ camera, gl }) => {
@@ -463,7 +402,7 @@ export default function Scene({ active, parallax, tier = "high", onLowFps, onRea
           </group>
         </Rig>
         {CAPTURE || stage < total ? null : !compiled ? (
-          <Compile onCompiled={onCompiled} />
+          <PrepareShaders onReady={onCompiled} />
         ) : !uploaded ? (
           <Upload groups={groups} onDone={onUploaded} />
         ) : (

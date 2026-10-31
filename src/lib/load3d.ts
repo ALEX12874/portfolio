@@ -1,18 +1,14 @@
 /**
- * Loads the 3D libraries in steps, each on its own idle moment: three.js,
- * then @react-three/fiber (the few drei members used come with the scene). Evaluating all ~800 kB in one go was a
- * single long freeze; split up, every step is a shorter task the browser can
- * schedule around input and painting. Later calls share the same promise.
+ * Loads the 3D libraries in steps: three.js, then @react-three/fiber (the few
+ * drei members used come with each scene), with one frame in between.
+ * Evaluating everything in one go was a single long freeze; split up, each
+ * step is a shorter task and the page keeps painting in between, without
+ * waiting for idle time, so the 3D still arrives quickly.
+ * Later calls share the same promise.
  */
-type IdleWindow = Window & {
-  requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-};
-
-const idle = () =>
+const nextFrame = () =>
   new Promise<void>((resolve) => {
-    const ric = (window as IdleWindow).requestIdleCallback;
-    if (ric) ric(() => resolve(), { timeout: 1000 });
-    else window.setTimeout(resolve, 50);
+    requestAnimationFrame(() => window.setTimeout(resolve, 0));
   });
 
 let loading: Promise<void> | null = null;
@@ -21,9 +17,9 @@ export function load3d(): Promise<void> {
   if (!loading) {
     loading = (async () => {
       await import("three");
-      await idle();
+      await nextFrame();
       await import("@react-three/fiber");
-      await idle();
+      await nextFrame();
     })().catch(() => {
       // let the scene's own import surface (and retry) any real failure
       loading = null;

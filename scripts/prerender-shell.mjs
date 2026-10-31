@@ -6,7 +6,7 @@
  *
  *   node scripts/prerender-shell.mjs [outDir=dist] [ssrDir=node_modules/.cache/shell-ssr]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import Beasties from "beasties";
@@ -76,13 +76,34 @@ final = final.replace(mainScript[0], "");
 preloads.forEach((m) => {
   final = final.replace(m[0], "");
 });
+// the orbit's chunks (three.js, fiber, the scene) are fetched together once the
+// page has loaded; lib/load3d then runs them in steps from the cache, so the
+// steps don't each wait for the network
+const manifestFile = resolve(outDir, ".vite/manifest.json");
+if (!existsSync(manifestFile)) throw new Error("prerender-shell: build manifest not found");
+const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+rmSync(resolve(outDir, ".vite"), { recursive: true, force: true });
+const orbitFiles = new Set();
+const collect = (key) => {
+  const chunk = manifest[key];
+  if (!chunk || orbitFiles.has(chunk.file)) return;
+  orbitFiles.add(chunk.file);
+  (chunk.imports || []).forEach(collect);
+};
+collect("src/components/skills/SolarSystem.tsx");
+if (!orbitFiles.size) throw new Error("prerender-shell: orbit chunk not found in the manifest");
+const booted = new Set([mainScript[1], ...preloads.map((m) => m[1])]);
+const orbit = [...orbitFiles].map((f) => base + f).filter((h) => !booted.has(h));
+
 const loader =
-  "<script>(function(){var d=document,done=0;function go(){if(done)return;done=1;" +
+  '<script>(function(){var d=document,done=0;function pre(h){var l=d.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;d.head.appendChild(l)}function go(){if(done)return;done=1;' +
   JSON.stringify(preloads.map((m) => m[1])) +
-  '.forEach(function(h){var l=d.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;d.head.appendChild(l)});' +
+  ".forEach(pre);" +
   'var s=d.createElement("script");s.type="module";s.crossOrigin="";s.src=' +
   JSON.stringify(mainScript[1]) +
-  ';d.head.appendChild(s)}var i=d.querySelector("#shell img");if(!i||i.complete)go();else{i.addEventListener("load",go);i.addEventListener("error",go)}setTimeout(go,2500)})()</script>';
+  ';d.head.appendChild(s)}var i=d.querySelector("#shell img");if(!i||i.complete)go();else{i.addEventListener("load",go);i.addEventListener("error",go)}setTimeout(go,2500);addEventListener("load",function(){' +
+  JSON.stringify(orbit) +
+  '.forEach(pre)})})()</script>';
 final = final.replace("</body>", `    ${loader}\n  </body>`);
 
 writeFileSync(file, final);

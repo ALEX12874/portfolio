@@ -8,7 +8,7 @@ import { useMotionLevel } from "../../hooks/useMotionLevel";
 import { useSceneTurn } from "../../lib/sceneArbiter";
 import type { SceneTier } from "./HeroScene/Scene";
 import { StaticRender } from "../../lib/shell";
-import { markHeroSceneDone, useSettled, whenLiveSceneMayStart } from "../../lib/settle";
+import { useSettled, whenLiveSceneMayStart } from "../../lib/settle";
 import { load3d } from "../../lib/load3d";
 
 // the 3D libraries arrive in idle-time steps, then the scene itself
@@ -78,11 +78,6 @@ function SceneStage() {
   const useLive = webgl && !calm && !!tier && !failed && settledPage;
   const live = useLive && ready;
 
-  // let the solar system build once this scene is on screen — or once it is
-  // clear there won't be one (phone, calm motion, no WebGL, too slow)
-  useEffect(() => {
-    if (live || failed || calm || !tier || (settledPage && !webgl)) markHeroSceneDone();
-  }, [live, failed, calm, tier, settledPage, webgl]);
   // one WebGL scene at a time: the hero only renders while it is the most
   // visible scene (the solar system takes over further down)
   const { ref, active } = useSceneTurn<HTMLDivElement>("hero", useLive);
