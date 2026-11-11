@@ -84,7 +84,7 @@ export default function AlienButton() {
         </g>
         {/* …which turns into the voice pill's sound bars */}
         <g className="alien-bars">
-          <rect x="6" y="12" width="28" height="16" rx="8" fill="#151515" stroke="#F5F0E8" strokeOpacity="0.3" strokeWidth="0.8" />
+          <rect x="6" y="12" width="28" height="16" rx="8" fill="#151515" />
           {[13.5, 18, 22.5, 27].map((x, i) => (
             <rect
               key={x}
