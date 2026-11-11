@@ -1718,3 +1718,285 @@ html.lenis {
 @media (orientation: landscape) and (max-height: 520px) and (min-height: 340px) {
   .skel-real-me { min-height: 100svh; }
 }
+
+/* ---- footer: "Whisper to me" voice pill (components/layout/WhisperButton) ---- */
+.whisper-wrap {
+  position: relative;
+  display: inline-block;
+}
+.whisper {
+  position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1.15rem 0 0.4rem;
+  /* glossy black liquid (the Venom look); on desktop the goo canvas
+     (whisperGoo.ts) draws it live while the pointer is near */
+  border: 1.5px solid rgba(245, 240, 232, 0.22);
+  border-radius: 999px;
+  background:
+    radial-gradient(90% 120% at 28% -10%, rgba(245, 240, 232, 0.3), rgba(245, 240, 232, 0) 48%),
+    linear-gradient(180deg, rgba(245, 240, 232, 0.08), rgba(245, 240, 232, 0) 55%),
+    #151515;
+  color: #f5f0e8;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(245, 240, 232, 0.35),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.55),
+    0 10px 22px rgba(0, 0, 0, 0.5);
+  touch-action: manipulation; /* quick taps never zoom */
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s, box-shadow 0.25s;
+}
+.whisper:focus-visible {
+  outline: 3px solid #d8ff63;
+  outline-offset: 3px;
+  transform: translateY(-2px);
+  border-color: #e63843;
+}
+@media (hover: hover) {
+  .whisper:hover {
+    transform: translateY(-2px);
+    border-color: #e63843;
+  }
+  .whisper:hover .whisper-bar {
+    animation: whisper-wiggle 0.5s ease-out 1;
+  }
+}
+.whisper:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(245, 240, 232, 0.25),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.55),
+    0 4px 10px rgba(0, 0, 0, 0.45);
+}
+/* the goo canvas is drawing the pill: the button keeps only its label */
+.whisper-wrap.is-goo .whisper,
+.whisper-wrap.is-goo .whisper:hover,
+.whisper-wrap.is-goo .whisper:active {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.whisper-capsule {
+  display: inline-flex;
+  width: 44px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 999px;
+  background: #151515;
+  box-shadow: inset 0 0 0 1px rgba(245, 240, 232, 0.22);
+  transition: background-color 0.25s;
+}
+.whisper[data-state="playing"] .whisper-capsule {
+  background: #e63843;
+}
+.whisper-bar {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: #d8ff63;
+  transform: scaleY(0.45);
+  animation: whisper-breathe 1.8s ease-in-out infinite;
+}
+.whisper-bar:nth-child(2),
+.whisper-bar:nth-child(4) {
+  height: 18px;
+}
+.whisper-bar:nth-child(3) {
+  height: 20px;
+}
+.whisper[data-state="playing"] .whisper-bar {
+  animation: none; /* JS follows the voice (an animation would override it) */
+  background: #f5f0e8;
+}
+@keyframes whisper-breathe {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+}
+@keyframes whisper-wiggle {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  30% {
+    transform: scaleY(1);
+  }
+  60% {
+    transform: scaleY(0.25);
+  }
+}
+.whisper-check {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: #d8ff63;
+  color: #151515;
+  font-size: 0.7rem;
+  font-weight: 800;
+  opacity: 0;
+  transform: scale(0.4);
+  pointer-events: none;
+}
+.whisper[data-state="done"] .whisper-check {
+  animation: whisper-check 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes whisper-check {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.whisper-progress {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -7px;
+  height: 2px;
+  border-radius: 2px;
+  background: #e63843;
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
+}
+.whisper[data-state="playing"] .whisper-progress {
+  opacity: 1;
+}
+.whisper-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: #e63843;
+  color: #f5f0e8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* the Venom goo (whisperGoo.ts): behind the label, never in the way */
+.whisper-goo {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  contain: strict;
+}
+/* the arrival shake (WhisperButton): transform only */
+.whisper-wrap.is-shaking {
+  will-change: transform;
+  animation: whisper-shake 0.6s ease-out 1;
+}
+.whisper-wrap.is-shaking .whisper-bar {
+  animation: whisper-wiggle 0.6s ease-out 1;
+}
+@keyframes whisper-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  30% {
+    transform: translateX(4px) rotate(2deg);
+  }
+  45% {
+    transform: translateX(-3px) rotate(-1.5deg);
+  }
+  60% {
+    transform: translateX(3px) rotate(1deg);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+/* reduced motion: a soft red ring fades in and out instead (opacity only) */
+.whisper-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid #e63843;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .whisper-wrap.is-shaking {
+    will-change: auto;
+    animation: none;
+  }
+  .whisper-wrap.is-shaking::after {
+    animation: whisper-ring 0.9s ease-out 1;
+  }
+  .whisper-wrap.is-shaking .whisper-bar,
+  .whisper-bar {
+    animation: none;
+  }
+  .whisper:hover,
+  .whisper:focus-visible,
+  .whisper:active {
+    transform: none;
+  }
+}
+@keyframes whisper-ring {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.9;
+  }
+}
+.whisper-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  background: #d8ff63;
+  color: #151515;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+

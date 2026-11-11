@@ -10,6 +10,7 @@ export const site = {
   roleLine: "Marketing | Consumer Behaviour | Brand Strategy",
   location: "Rajasthan, India",
   email: "gouranglokwani27@gmail.com",
+  /** Reached by triple-clicking "Whisper to me" in the footer (and in JSON-LD sameAs). */
   linkedin: "https://www.linkedin.com/in/gourang-lokwani-438394297/",
   /** Empty by default — the GitHub button auto-hides when this is "". */
   github: "",

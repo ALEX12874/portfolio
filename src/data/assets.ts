@@ -17,6 +17,8 @@ import certHlbs from "../assets/cert-hlbs.webp";
 import certGyayak from "../assets/cert-gyayak.pdf?url";
 // original PNG, referenced only by the Download button (never preloaded)
 import certHlbsOriginal from "../assets/cert-hlbs.png?url";
+// recorded by Gourang (AAC in .m4a: plays in every current browser)
+import voiceClip from "../assets/audio/hire-karlo-mujhe.m4a?url";
 
 export const assets = {
   /** Hero 3D billboard texture — bright red "IT'S ALL MARKETING." artwork (4:1). */
@@ -37,6 +39,8 @@ export const assets = {
   certGyayak,
   /** Full-quality PNG of the HLBS certificate, for "Download" only. */
   certHlbsOriginal,
+  /** Footer voice clip, ≈2 s, "Hire karlo mujhe" (never autoplayed). */
+  voiceClip,
 } as const;
 
 /** Friendly filename for the résumé download (the shipped file is hashed). */

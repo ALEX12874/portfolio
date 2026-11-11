@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Linkedin, Mail, MapPin } from "lucide-react";
+import { ArrowUp, Mail, MapPin } from "lucide-react";
 import { site } from "../../data/site";
 import { scrollToSection } from "../../lib/scroll";
+import { useVoice, watchVoice } from "../../lib/voicePlayer";
 import DottedBackground from "./DottedBackground";
 import ContactForm from "./ContactForm";
+import WhisperButton from "./WhisperButton";
 
 const rowLabel =
   "font-display text-[0.7rem] font-bold uppercase tracking-[0.24em] text-[rgba(245,240,232,0.5)]";
@@ -15,8 +17,11 @@ const rowLabel =
 export default function Footer() {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<number | undefined>(undefined);
+  const footer = useRef<HTMLElement | null>(null);
+  const { toast } = useVoice();
 
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
+  useEffect(() => (footer.current ? watchVoice(footer.current) : undefined), []);
 
   const copyEmail = async () => {
     try {
@@ -32,6 +37,7 @@ export default function Footer() {
   return (
     <footer
       id="contact"
+      ref={footer}
       aria-labelledby="contact-heading"
       className="on-ink relative overflow-hidden bg-[#151515] text-[#F5F0E8]"
     >
@@ -89,22 +95,12 @@ export default function Footer() {
                   </span>
                 </dd>
               </div>
-
-              <div className="py-4 sm:py-6">
-                <dt className={rowLabel}>Elsewhere</dt>
-                <dd className="mt-3">
-                  <a
-                    href={site.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Gourang Lokwani on LinkedIn"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(245,240,232,0.3)] transition-all duration-300 ease-editorial hover:-translate-y-0.5 hover:border-[#D8FF63] hover:bg-[#D8FF63] hover:text-[#151515]"
-                  >
-                    <Linkedin size={18} aria-hidden="true" />
-                  </a>
-                </dd>
-              </div>
             </dl>
+
+            {/* a voice note where the LinkedIn icon was; a triple-click opens LinkedIn */}
+            <div className="border-b border-[rgba(245,240,232,0.12)] py-4 sm:py-6">
+              <WhisperButton />
+            </div>
           </div>
 
           {/* ---- form ---- */}
@@ -132,6 +128,12 @@ export default function Footer() {
           </button>
         </div>
       </div>
+
+      {toast ? (
+        <p role="status" className="whisper-toast">
+          Opening LinkedIn…
+        </p>
+      ) : null}
     </footer>
   );
 }
