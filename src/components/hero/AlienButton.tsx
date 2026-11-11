@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { scrollToCenter, scrollToSection } from "../../lib/scroll";
+import { whenLiveSceneMayStart } from "../../lib/settle";
 import { markInteracted, playVoice, unlockVoice } from "../../lib/voicePlayer";
 
 /**
@@ -46,14 +48,58 @@ function goToVoice() {
   window.setTimeout(tick, 100);
 }
 
+/** The footer pill's goo, smaller: short tentacles that latch onto the pointer. */
+const HERO_GOO = {
+  zone: 70,
+  pad: 110,
+  vpad: 110,
+  strands: 4,
+  awareness: 70,
+  maxLen: 85,
+  baseRadius: 4,
+  tipRadius: 1.4,
+  lateral: [0, 14, -14, 26],
+  lane: false,
+  quietWhilePlaying: false,
+  clipRoot: ".hero-copy",
+};
+
 export default function AlienButton() {
+  const ref = useRef<HTMLButtonElement | null>(null);
+
+  // desktop mice only, after the first-load window (with the hero's 3D
+  // scene): the goo chunk, shared with the footer pill, wakes up here too
+  useEffect(() => {
+    const btn = ref.current;
+    if (
+      !btn ||
+      typeof ResizeObserver === "undefined" ||
+      !window.matchMedia("(hover: hover) and (pointer: fine)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return undefined;
+    let stop: (() => void) | undefined;
+    let live = true;
+    void whenLiveSceneMayStart()
+      .then(() => import("../layout/whisperGoo"))
+      .then((m) => {
+        if (live) stop = m.startWhisperGoo(btn, btn, HERO_GOO);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      stop?.();
+    };
+  }, []);
+
   return (
     <button
+      ref={ref}
       type="button"
       onClick={goToVoice}
       aria-label="Hear a short voice message from Gourang (goes to the contact section)"
       title="Whisper to me"
-      className="icon-circle alien-btn !h-[52px] !w-[52px]"
+      className="icon-circle alien-btn relative !h-[52px] !w-[52px]"
     >
       <svg viewBox="0 0 40 40" className="h-[38px] w-[38px] overflow-visible" aria-hidden="true">
         {/* the alien */}

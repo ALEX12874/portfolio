@@ -18,8 +18,12 @@ if (!container) {
 }
 
 // a lazy chunk that fails to load after a redeploy (stale hashes): reload
-// once to pick up the new build instead of leaving a blank section
+// once to pick up the new build instead of leaving a blank section. Never
+// while offline: a reload can't fetch anything and would replace the whole
+// page with the browser's offline screen (optional extras, like the goo,
+// simply stay off; sections show their own Retry)
 window.addEventListener("vite:preloadError", (event) => {
+  if (!navigator.onLine) return;
   const key = "reloaded-after-preload-error";
   try {
     if (sessionStorage.getItem(key)) return;

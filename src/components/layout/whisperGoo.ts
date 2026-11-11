@@ -143,18 +143,57 @@ void main() {
   outC = vec4(col * cov, cov);
 }`;
 
+/** Size and behaviour of one goo button (the footer pill is the default). */
+export interface GooOptions {
+  /** px around the button where the goo wakes up */
+  zone: number;
+  /** px of canvas left/right of the button (grows to cover the lane) */
+  pad: number;
+  /** px of canvas above and below the button */
+  vpad: number;
+  /** tendrils at most (≤ MAX_STRANDS) */
+  strands: number;
+  awareness: number;
+  maxLen: number;
+  baseRadius: number;
+  tipRadius: number;
+  /** px along the button's edge, per tendril */
+  lateral: readonly number[];
+  /** also wake up anywhere along the button's ruled row */
+  lane: boolean;
+  /** keep the pill clean while the voice clip plays */
+  quietWhilePlaying: boolean;
+  /** container whose text and controls the goo must stay off */
+  clipRoot: string;
+}
+
+const FOOTER_PILL: GooOptions = {
+  zone: ZONE_PADDING,
+  pad: DRAW_PAD,
+  vpad: VPAD,
+  strands: MAX_STRANDS,
+  awareness: AWARENESS,
+  maxLen: MAX_LEN,
+  baseRadius: BASE_RADIUS,
+  tipRadius: TIP_RADIUS,
+  lateral: LATERAL,
+  lane: true,
+  quietWhilePlaying: true,
+  clipRoot: "footer",
+};
+
 /** Starts the effect; returns its cleanup. Any failure disables it silently. */
-export function startWhisperGoo(host: HTMLElement, button: HTMLElement): () => void {
+export function startWhisperGoo(host: HTMLElement, button: HTMLElement, options: Partial<GooOptions> = {}): () => void {
   try {
-    return start(host, button);
+    return start(host, button, { ...FOOTER_PILL, ...options });
   } catch {
     return () => undefined;
   }
 }
 
-function start(host: HTMLElement, button: HTMLElement): () => void {
+function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => void {
   const S = MAX_STRANDS;
-  const footer = host.closest("footer") ?? host;
+  const footer = host.closest<HTMLElement>(cfg.clipRoot) ?? host;
   const stats = (window as unknown as { __whisperWebStats?: Stats }).__whisperWebStats;
 
   // ---- WebGL, prepared up front (shaders compile in the background) ----
@@ -185,6 +224,17 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   gl.linkProgram(prog);
   let ready = false;
   let failed = false;
+  const vao = gl.createVertexArray();
+  // looked up only once the program has linked: asking earlier would make
+  // the page wait for the GPU compile (a freeze)
+  let uRes: WebGLUniformLocation | null = null;
+  let uDpr: WebGLUniformLocation | null = null;
+  let uTime: WebGLUniformLocation | null = null;
+  let uBtn: WebGLUniformLocation | null = null;
+  let uMound: WebGLUniformLocation | null = null;
+  let uGrip: WebGLUniformLocation | null = null;
+  let uPts: WebGLUniformLocation | null = null;
+  let uBox: WebGLUniformLocation | null = null;
   const checkReady = () => {
     if (ready || failed) return ready;
     if (parallel && !gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR)) return false;
@@ -193,18 +243,17 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
       return false;
     }
     gl.useProgram(prog);
+    uRes = gl.getUniformLocation(prog, "uRes");
+    uDpr = gl.getUniformLocation(prog, "uDpr");
+    uTime = gl.getUniformLocation(prog, "uTime");
+    uBtn = gl.getUniformLocation(prog, "uBtn");
+    uMound = gl.getUniformLocation(prog, "uMound");
+    uGrip = gl.getUniformLocation(prog, "uGrip");
+    uPts = gl.getUniformLocation(prog, "uPts");
+    uBox = gl.getUniformLocation(prog, "uBox");
     ready = true;
     return true;
   };
-  const vao = gl.createVertexArray();
-  const uRes = gl.getUniformLocation(prog, "uRes");
-  const uDpr = gl.getUniformLocation(prog, "uDpr");
-  const uTime = gl.getUniformLocation(prog, "uTime");
-  const uBtn = gl.getUniformLocation(prog, "uBtn");
-  const uMound = gl.getUniformLocation(prog, "uMound");
-  const uGrip = gl.getUniformLocation(prog, "uGrip");
-  const uPts = gl.getUniformLocation(prog, "uPts");
-  const uBox = gl.getUniformLocation(prog, "uBox");
 
   // ---- tendril state, preallocated ----
   const state = new Uint8Array(S); // 0 off, 1 reaching, 2 snapping back
@@ -220,10 +269,10 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   let pageTop = 0;
   let laneTop = 0;
   let laneBottom = 0;
-  let padL = DRAW_PAD;
-  let padR = DRAW_PAD;
-  const padT = VPAD;
-  const padB = VPAD;
+  let padL = cfg.pad;
+  let padR = cfg.pad;
+  const padT = cfg.vpad;
+  const padB = cfg.vpad;
   let grip = 0; // how firmly the tendrils hold the pointer (0–1)
   let laneLeft = 0;
   let laneRight = 0;
@@ -249,6 +298,12 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   let mound = 0;
   let unmountTimer = 0;
   let resizeTimer = 0;
+  let readyTimer = 0;
+  // last frame's drawn box, in device pixels (cleared next frame)
+  let lastX = 0;
+  let lastY = 0;
+  let lastW = 0;
+  let lastH = 0;
   let scrollRaf = 0;
   // pill geometry in canvas coordinates
   let cx = 0;
@@ -323,8 +378,8 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     const d = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     // the canvas covers the button's surroundings and its whole lane, so a
     // tendril can reach the pointer anywhere along the row
-    const pl = Math.max(DRAW_PAD, Math.round(r.left - row.left) + 30);
-    const pr = Math.max(DRAW_PAD, Math.round(row.right - r.right) + 30);
+    const pl = cfg.lane ? Math.max(cfg.pad, Math.round(r.left - row.left) + 30) : cfg.pad;
+    const pr = cfg.lane ? Math.max(cfg.pad, Math.round(row.right - r.right) + 30) : cfg.pad;
     if (w !== bw || h !== bh || d !== dpr || pl !== padL || pr !== padR) {
       bw = w;
       bh = h;
@@ -350,6 +405,11 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   const mount = () => {
     if (mounted) return;
     mounted = true;
+    // nothing known about what is on the canvas: the first frame clears it all
+    lastX = 0;
+    lastY = 0;
+    lastW = canvas.width;
+    lastH = canvas.height;
     host.insertBefore(canvas, host.firstChild);
   };
   const unmount = () => {
@@ -361,11 +421,11 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   };
 
   const spawn = (k: number, lx: number, ly: number) => {
-    // anchor: on the edge facing the pointer, shifted along it by LATERAL[k]
+    // anchor: on the edge facing the pointer, shifted along it by cfg.lateral[k]
     edge(lx, ly);
     const tx = -eny;
     const ty = enx;
-    edge(ex + tx * LATERAL[k], ey + ty * LATERAL[k]);
+    edge(ex + tx * cfg.lateral[k], ey + ty * cfg.lateral[k]);
     anx[k] = ex - enx * 4;
     any[k] = ey - eny * 4;
     for (let i = 0; i < P; i += 1) {
@@ -398,8 +458,8 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     // reaching only from outside the pill: hovering, clicking or listening,
     // the pill keeps its clean shape
     // (in the lane, however far away, the tendrils still reach toward it)
-    const aware = inside && dist > 6 && (dist < AWARENESS || lane) && voiceState().status !== "playing";
-    const close = aware ? Math.max(lane ? 0.45 : 0, 1 - Math.max(0, dist) / AWARENESS) : 0;
+    const aware = inside && dist > 6 && (dist < cfg.awareness || lane) && (!cfg.quietWhilePlaying || voiceState().status !== "playing");
+    const close = aware ? Math.max(lane ? 0.45 : 0, 1 - Math.max(0, dist) / cfg.awareness) : 0;
     // the surface swells toward the pointer
     const mx = ex + enx * (3 + 5 * close);
     const my = ey + eny * (3 + 5 * close);
@@ -407,7 +467,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     // how many tendrils: more the closer the pointer is
     let reaching = 0;
     for (let k = 0; k < S; k += 1) if (state[k] === 1) reaching += 1;
-    const want = aware ? 1 + Math.floor(close * (S - 1) + 0.5) : 0;
+    const want = aware ? 1 + Math.floor(close * (cfg.strands - 1) + 0.5) : 0;
     if (reaching < want && now - lastSpawn > SPAWN_GAP_MS) {
       for (let k = 0; k < S; k += 1) {
         if (state[k] === 0) {
@@ -442,8 +502,8 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
           const d = Math.sqrt(dx * dx + dy * dy);
           // in the lane they reach all the way; elsewhere they snap when
           // pulled too far
-          if (!aware || (!lane && d > MAX_LEN * SNAP_STRETCH)) state[k] = 2;
-          else target = lane || d < MAX_LEN ? d : MAX_LEN;
+          if (!aware || (!lane && d > cfg.maxLen * SNAP_STRETCH)) state[k] = 2;
+          else target = lane || d < cfg.maxLen ? d : cfg.maxLen;
         }
         if (len[k] < target) len[k] = Math.min(target, len[k] + GROW_SPEED * SUBSTEP);
         else len[k] = Math.max(target, len[k] - (state[k] === 2 ? RETRACT_SPEED : GROW_SPEED) * SUBSTEP);
@@ -473,7 +533,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
           const fl = Math.sqrt(fx * fx + fy * fy) || 1;
           fx /= fl;
           fy /= fl;
-          const side = LATERAL[k] * 0.1 + Math.sin(time * 3.1 + k * 2.3) * 2;
+          const side = cfg.lateral[k] * 0.1 + Math.sin(time * 3.1 + k * 2.3) * 2;
           pos[o] += (lx - fy * side - pos[o]) * TIP_PULL;
           pos[o + 1] += (ly + fx * side - pos[o + 1]) * TIP_PULL;
         }
@@ -519,7 +579,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
         const o = (k * P + i) * 2;
         const q = (k * P + i) * 4;
         const t = i / (P - 1);
-        const r = (BASE_RADIUS + (TIP_RADIUS - BASE_RADIUS) * t) * thin;
+        const r = (cfg.baseRadius + (cfg.tipRadius - cfg.baseRadius) * t) * thin;
         pts[q] = pos[o];
         pts[q + 1] = pos[o + 1];
         pts[q + 2] = r;
@@ -535,10 +595,10 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
         const td = Math.sqrt(tdx * tdx + tdy * tdy);
         if (td < nearest) nearest = td;
       }
-      box[b4] = x0 - BASE_RADIUS - 18;
-      box[b4 + 1] = y0 - BASE_RADIUS - 18;
-      box[b4 + 2] = x1 + BASE_RADIUS + 18;
-      box[b4 + 3] = y1 + BASE_RADIUS + 18;
+      box[b4] = x0 - cfg.baseRadius - 18;
+      box[b4 + 1] = y0 - cfg.baseRadius - 18;
+      box[b4 + 2] = x1 + cfg.baseRadius + 18;
+      box[b4 + 3] = y1 + cfg.baseRadius + 18;
     }
 
     // the tips have the pointer: a small drop of goo gathers there
@@ -557,13 +617,24 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
       if (box[b4 + 2] > sx1) sx1 = box[b4 + 2];
       if (box[b4 + 3] > sy1) sy1 = box[b4 + 3];
     }
-    // (no clear needed: without preserveDrawingBuffer the browser hands us a
-    // cleared buffer every frame, and the shader writes every scissored pixel)
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.enable(gl.SCISSOR_TEST);
     const scX = Math.max(0, Math.floor(sx0 * dpr));
     const scY = Math.max(0, Math.floor((zh - sy1) * dpr));
-    gl.scissor(scX, scY, Math.max(0, Math.ceil(sx1 * dpr) - scX), Math.max(0, Math.ceil((zh - sy0) * dpr) - scY));
+    const scW = Math.max(0, Math.ceil(sx1 * dpr) - scX);
+    const scH = Math.max(0, Math.ceil((zh - sy0) * dpr) - scY);
+    // clear what was drawn last frame plus this frame's box (a low-latency
+    // canvas keeps its pixels between frames), then draw this frame's box
+    const ux = Math.min(scX, lastX);
+    const uy = Math.min(scY, lastY);
+    gl.scissor(ux, uy, Math.max(scX + scW, lastX + lastW) - ux, Math.max(scY + scH, lastY + lastH) - uy);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    lastX = scX;
+    lastY = scY;
+    lastW = scW;
+    lastH = scH;
+    gl.scissor(scX, scY, scW, scH);
     gl.uniform2f(uRes, zw, zh);
     gl.uniform1f(uDpr, dpr);
     gl.uniform1f(uTime, time);
@@ -601,7 +672,16 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   };
 
   const begin = () => {
-    if (!checkReady()) return;
+    if (!checkReady()) {
+      // still compiling: look again shortly, as long as the pointer stays near
+      if (!readyTimer && !failed) {
+        readyTimer = window.setTimeout(() => {
+          readyTimer = 0;
+          if (!running && onScreen && !document.hidden && (inZone() || inLane())) begin();
+        }, 50);
+      }
+      return;
+    }
     window.clearTimeout(unmountTimer);
     measure();
     mount();
@@ -623,10 +703,11 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   const inZone = () => {
     const l = pageLeft - window.scrollX;
     const t = pageTop - window.scrollY;
-    const Z = ZONE_PADDING;
+    const Z = cfg.zone;
     return px >= l - Z && px <= l + bw + Z && py >= t - Z && py <= t + bh + Z;
   };
   const inLane = () =>
+    cfg.lane &&
     py >= laneTop - window.scrollY &&
     py <= laneBottom - window.scrollY &&
     px >= laneLeft - window.scrollX &&
@@ -712,6 +793,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     cancelAnimationFrame(scrollRaf);
     window.clearTimeout(unmountTimer);
     window.clearTimeout(resizeTimer);
+    window.clearTimeout(readyTimer);
     running = false;
     unmount();
     host.style.removeProperty("isolation");

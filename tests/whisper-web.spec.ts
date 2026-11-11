@@ -44,7 +44,7 @@ test.describe("desktop mouse", () => {
     const fb = (await form.boundingBox())!;
     for (let i = 0; i <= 10; i += 1) await page.mouse.move(fb.x + (fb.width * i) / 10, fb.y + (fb.height * (10 - i)) / 10);
     await page.waitForTimeout(300);
-    await expect(page.locator(".whisper-goo")).toHaveCount(0);
+    await expect(page.locator("#contact .whisper-goo")).toHaveCount(0);
     expect(await form.screenshot()).toEqual(before);
   });
 
@@ -62,7 +62,7 @@ test.describe("desktop mouse", () => {
     const quietBeyond = await page.screenshot({ clip: beyond });
 
     await nearPill(page);
-    const canvas = page.locator(".whisper-goo");
+    const canvas = page.locator("#contact .whisper-goo");
     await expect(canvas).toHaveCount(1);
     await expect(page.locator("#contact .whisper-wrap")).toHaveClass(/is-goo/);
     // the canvas is the zone around the pill only
@@ -87,7 +87,7 @@ test.describe("desktop mouse", () => {
     );
     const pill = await toPill(page);
     await nearPill(page);
-    await expect(page.locator(".whisper-goo")).toHaveCount(1);
+    await expect(page.locator("#contact .whisper-goo")).toHaveCount(1);
     await pill.click();
     await expect(pill).toHaveAttribute("data-state", "playing");
     await expect(pill).toHaveAttribute("data-state", "idle", { timeout: 6000 });
@@ -123,7 +123,7 @@ for (const [name, opts] of [
       const box = (await pill.boundingBox())!;
       await page.mouse.move(box.x + box.width + 60, box.y + 20, { steps: 8 });
       await page.waitForTimeout(500);
-      await expect(page.locator(".whisper-goo")).toHaveCount(0);
+      await expect(page.locator("#contact .whisper-goo")).toHaveCount(0);
       expect(chunks).toEqual([]);
     });
   });
@@ -146,12 +146,44 @@ test.describe("the button's lane", () => {
     const y = row.y + row.height / 2;
     await page.mouse.move(x, y);
     await page.waitForTimeout(500);
-    await expect(page.locator(".whisper-goo")).toHaveCount(1);
+    await expect(page.locator("#contact .whisper-goo")).toHaveCount(1);
     const stats = () => page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number; reach: number } }).__whisperWebStats);
     expect((await stats()).strands).toBeGreaterThan(0);
     // however far along the row, the tendrils reach the pointer itself
     await expect.poll(async () => (await stats()).reach, { timeout: 3000 }).toBeLessThan(14);
     await page.mouse.move(x, y - 300, { steps: 4 });
-    await expect(page.locator(".whisper-goo")).toHaveCount(0, { timeout: 6000 });
+    await expect(page.locator("#contact .whisper-goo")).toHaveCount(0, { timeout: 6000 });
+  });
+});
+
+test.describe("hero alien goo", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test("smaller tentacles reach from the alien circle and latch onto the pointer", async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { __whisperWebStats: unknown }).__whisperWebStats = { js: [], lat: [] };
+    });
+    await page.goto("/");
+    await expect(page.locator("#shell")).toHaveCount(0, { timeout: 20_000 });
+    const btn = page.locator("#home .alien-btn");
+    // the goo loads once the first screen has settled: keep nudging the
+    // pointer just below the circle until it wakes
+    await expect
+      .poll(
+        async () => {
+          const bb = (await btn.boundingBox())!;
+          await page.mouse.move(bb.x + bb.width / 2 + 10, bb.y + bb.height / 2 + 66);
+          await page.mouse.move(bb.x + bb.width / 2 + 12, bb.y + bb.height / 2 + 70);
+          return page.locator("#home .whisper-goo").count();
+        },
+        { timeout: 15_000, intervals: [500] }
+      )
+      .toBe(1);
+    const bb = (await btn.boundingBox())!;
+    const stats = () => page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number; reach: number } }).__whisperWebStats);
+    await expect.poll(async () => (await stats()).reach, { timeout: 3000 }).toBeLessThan(10);
+    // the alien button still works
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await btn.click();
+    await expect(page.locator("#contact .whisper")).toHaveAttribute("data-state", "playing", { timeout: 10_000 });
   });
 });

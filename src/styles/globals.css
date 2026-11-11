@@ -2019,6 +2019,17 @@ html.lenis {
 .alien-btn svg * {
   transform-box: fill-box;
 }
+/* the goo canvas is drawing the circle: the button keeps only the alien */
+.alien-btn.is-goo,
+.alien-btn.is-goo:hover {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.alien-btn svg {
+  position: relative; /* above the goo canvas */
+}
 /* a 6 s loop: the alien dances, squishes into the bars, the bars play, back */
 .alien {
   transform-origin: 50% 70%;
