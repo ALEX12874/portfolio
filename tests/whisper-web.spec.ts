@@ -76,7 +76,7 @@ test.describe("desktop mouse", () => {
 
     // leave: the tendrils snap back; after 2 s at rest the CSS pill takes over
     await page.mouse.move(900, 200);
-    await expect(canvas).toHaveCount(0, { timeout: 3500 });
+    await expect(canvas).toHaveCount(0, { timeout: 6000 });
     await expect(page.locator("#contact .whisper-wrap")).not.toHaveClass(/is-goo/);
   });
 

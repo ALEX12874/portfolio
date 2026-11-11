@@ -1,10 +1,11 @@
 import { useContext } from "react";
 import { m } from "framer-motion";
-import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { site } from "../../data/site";
-import { assets, RESUME_FILENAME } from "../../data/assets";
+import { assets } from "../../data/assets";
 import { scrollToSection } from "../../lib/scroll";
 import MagneticButton from "./MagneticButton";
+import AlienButton from "./AlienButton";
 import SocialButton, { GitHubMark, LinkedInMark } from "./SocialButton";
 import { StaticRender, hadShell, syncedDelay } from "../../lib/shell";
 
@@ -91,15 +92,7 @@ export default function HeroText() {
             <ArrowUpRight size={17} aria-hidden="true" />
           </MagneticButton>
 
-          <a
-            href={assets.resume}
-            download={RESUME_FILENAME}
-            aria-label="Download résumé"
-            className="icon-circle !h-[52px] !w-[52px]"
-            title="Download résumé"
-          >
-            <ArrowDownToLine size={19} aria-hidden="true" />
-          </a>
+          <AlienButton />
         </div>
 
         <button

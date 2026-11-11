@@ -25,6 +25,18 @@ export function scrollToSection(id: string) {
   el.scrollIntoView({ behavior: motionLevelNow() === "calm" ? "auto" : "smooth", block: "start" });
 }
 
+/** Glide an element to the middle of the screen (Lenis when running). */
+export function scrollToCenter(el: HTMLElement) {
+  const lenis = getLenis();
+  const offset = -(window.innerHeight - el.offsetHeight) / 2;
+  if (lenis) {
+    lenis.start();
+    lenis.scrollTo(el, { offset, duration: 1.1 });
+    return;
+  }
+  el.scrollIntoView({ behavior: motionLevelNow() === "calm" ? "auto" : "smooth", block: "center" });
+}
+
 /** Lock/unlock page scroll (used by overlays and drawers). */
 export function lockScroll(locked: boolean) {
   if (typeof document === "undefined") return;

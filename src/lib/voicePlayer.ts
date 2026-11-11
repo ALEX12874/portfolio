@@ -76,6 +76,32 @@ export function primeVoice() {
   a.load();
 }
 
+let unlocked = false;
+
+/**
+ * Called inside a click that will play the clip a moment later (the hero's
+ * alien glides to the footer first): a silent play/pause now lets that later
+ * play() through on browsers that only allow sound straight from a tap (iOS).
+ */
+export function unlockVoice() {
+  if (unlocked) return;
+  unlocked = true;
+  const a = element();
+  a.preload = "auto";
+  a.muted = true;
+  a.play()
+    .then(() => {
+      if (state.status !== "playing") {
+        a.pause();
+        a.currentTime = 0;
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      a.muted = false;
+    });
+}
+
 export function markInteracted() {
   if (!state.interacted) set({ interacted: true });
 }
@@ -86,6 +112,7 @@ export function playVoice() {
   if (state.status === "playing") return;
   const a = element();
   window.clearTimeout(statusTimer);
+  a.muted = false;
   a.currentTime = 0;
   set({ status: "playing" });
   a.play().catch((err: unknown) => {
@@ -146,8 +173,12 @@ export function watchVoice(footer: HTMLElement): () => void {
     },
     { rootMargin: "600px 0px" }
   );
+  // only when it actually leaves: a footer that mounts below the screen
+  // (while the hero's alien is gliding down to it) must not stop the clip
+  let seen = false;
   const onScreen = new IntersectionObserver(([e]) => {
-    if (!e.isIntersecting) stopVoice();
+    if (e.isIntersecting) seen = true;
+    else if (seen) stopVoice();
   });
   near.observe(footer);
   onScreen.observe(footer);

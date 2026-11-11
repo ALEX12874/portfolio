@@ -169,3 +169,25 @@ test.describe("reduced motion", () => {
     expect(seen).toEqual(["none|whisper-ring"]);
   });
 });
+
+test.describe("hero alien", () => {
+  for (const v of [VIEWPORTS[0], VIEWPORTS[1]]) {
+    test(`${v.name}: replaces the download icon; a click glides to the pill and plays the clip`, async ({ browser }) => {
+      const ctx = await browser.newContext({ viewport: v.viewport, isMobile: v.mobile, hasTouch: v.mobile });
+      const page = await ctx.newPage();
+      const problems = watch(page);
+      await page.goto("/");
+      await expect(page.locator("#shell")).toHaveCount(0, { timeout: 20_000 });
+      await expect(page.locator('a[download], a[aria-label="Download résumé"]')).toHaveCount(0);
+      const alien = page.locator("#home .alien-btn");
+      await expect(alien).toBeVisible();
+      await alien.click();
+      await expect.poll(async () => (await audio(page))?.paused, { timeout: 10_000 }).toBe(false);
+      const pill = page.locator("#contact .whisper");
+      await expect(pill).toHaveAttribute("data-state", "playing");
+      await expect(pill).toBeInViewport();
+      expect(problems).toEqual([]);
+      await ctx.close();
+    });
+  }
+});

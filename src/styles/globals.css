@@ -2000,3 +2000,155 @@ html.lenis {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
+
+/* ---- hero: the fidgeting alien that becomes the voice bars (AlienButton) ---- */
+/* the same glossy black liquid as the footer's "Whisper to me" pill */
+.alien-btn,
+.alien-btn:hover {
+  border: 1.5px solid rgba(245, 240, 232, 0.22);
+  background:
+    radial-gradient(90% 90% at 30% 8%, rgba(245, 240, 232, 0.32), rgba(245, 240, 232, 0) 50%),
+    linear-gradient(180deg, rgba(245, 240, 232, 0.08), rgba(245, 240, 232, 0) 55%),
+    #151515;
+  color: #f5f0e8;
+  box-shadow:
+    inset 0 1px 0 rgba(245, 240, 232, 0.35),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.55),
+    0 10px 22px rgba(21, 21, 21, 0.28);
+}
+.alien-btn svg * {
+  transform-box: fill-box;
+}
+/* a 6 s loop: the alien dances, squishes into the bars, the bars play, back */
+.alien {
+  transform-origin: 50% 70%;
+  animation: alien-cycle 6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.alien-bars {
+  transform-origin: 50% 50%;
+  animation: alien-bars-cycle 6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes alien-cycle {
+  0%,
+  52% {
+    opacity: 1;
+    transform: none;
+  }
+  60% {
+    opacity: 0;
+    transform: scale(0.15, 0.4);
+  }
+  92% {
+    opacity: 0;
+    transform: scale(0.15, 0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes alien-bars-cycle {
+  0%,
+  55% {
+    opacity: 0;
+    transform: scale(0.3, 0.1);
+  }
+  64% {
+    opacity: 1;
+    transform: none;
+  }
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  95%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3, 0.1);
+  }
+}
+.alien-dance {
+  transform-origin: 50% 90%;
+  animation: alien-dance 0.9s ease-in-out infinite alternate;
+}
+@keyframes alien-dance {
+  from {
+    transform: rotate(-9deg) translateY(0);
+  }
+  to {
+    transform: rotate(9deg) translateY(-1.5px);
+  }
+}
+.alien-antenna {
+  transform-origin: 50% 100%;
+  animation: alien-antenna 0.45s ease-in-out infinite alternate;
+}
+.alien-antenna--r {
+  animation-delay: -0.22s;
+}
+@keyframes alien-antenna {
+  from {
+    transform: rotate(-14deg);
+  }
+  to {
+    transform: rotate(14deg);
+  }
+}
+.alien-arm--l {
+  transform-origin: 100% 100%;
+  animation: alien-wave 0.45s ease-in-out infinite alternate;
+}
+.alien-arm--r {
+  transform-origin: 0% 100%;
+  animation: alien-wave 0.45s ease-in-out infinite alternate-reverse;
+}
+@keyframes alien-wave {
+  from {
+    transform: rotate(-18deg);
+  }
+  to {
+    transform: rotate(18deg);
+  }
+}
+.alien-eyes {
+  transform-origin: 50% 50%;
+  animation: alien-blink 3.2s ease-in-out infinite;
+}
+@keyframes alien-blink {
+  0%,
+  92%,
+  100% {
+    transform: none;
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+.alien-bar {
+  transform-origin: 50% 50%;
+  animation: alien-bar 0.5s ease-in-out infinite alternate;
+}
+@keyframes alien-bar {
+  from {
+    transform: scaleY(0.35);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+/* reduced motion: the alien just waves hello, still */
+@media (prefers-reduced-motion: reduce) {
+  .alien,
+  .alien-bars,
+  .alien-dance,
+  .alien-antenna,
+  .alien-arm--l,
+  .alien-arm--r,
+  .alien-eyes,
+  .alien-bar {
+    animation: none;
+  }
+  .alien-bars {
+    opacity: 0;
+  }
+}
