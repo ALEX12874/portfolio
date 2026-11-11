@@ -187,3 +187,51 @@ test.describe("hero alien goo", () => {
     await expect(page.locator("#contact .whisper")).toHaveAttribute("data-state", "playing", { timeout: 10_000 });
   });
 });
+
+test.describe("no leftovers", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test("sweeping the pointer along the row leaves nothing behind", async ({ page }) => {
+    await toPill(page);
+    const row = (await page.locator("#contact .whisper-wrap").locator("xpath=..").boundingBox())!;
+    const pill = (await page.locator("#contact .whisper").boundingBox())!;
+    // the row to the right of the pill, while nothing is there
+    const strip = { x: pill.x + pill.width + 12, y: row.y + 4, width: row.x + row.width - (pill.x + pill.width) - 16, height: row.height - 8 };
+    await page.mouse.move(pill.x + 30, row.y - 200);
+    const quiet = await page.screenshot({ clip: strip });
+    const y = row.y + row.height / 2;
+    for (let lap = 0; lap < 4; lap += 1) {
+      await page.mouse.move(row.x + row.width - 8, y, { steps: 10 });
+      await page.mouse.move(pill.x + pill.width + 20, y + 10, { steps: 10 });
+    }
+    // leave the zone above the row (the canvas stays up for 2 s, at rest)
+    await page.mouse.move(pill.x + 30, row.y - 200, { steps: 3 });
+    await page.waitForTimeout(700);
+    await expect(page.locator("#contact .whisper-goo")).toHaveCount(1);
+    const after = await page.screenshot({ clip: strip });
+    // pixels that differ visibly (> 24 of 255 in any channel): leftovers are
+    // black goo or bright highlights on the dark row, never 1-step rounding
+    const changed = await page.evaluate(
+      async ([a, b]) => {
+        const load = async (src: string) => {
+          const img = new Image();
+          img.src = `data:image/png;base64,${src}`;
+          await img.decode();
+          const c = document.createElement("canvas");
+          c.width = img.width;
+          c.height = img.height;
+          const x = c.getContext("2d")!;
+          x.drawImage(img, 0, 0);
+          return x.getImageData(0, 0, c.width, c.height).data;
+        };
+        const [da, db] = [await load(a), await load(b)];
+        let n = 0;
+        for (let i = 0; i < da.length; i += 4) {
+          if (Math.abs(da[i] - db[i]) > 24 || Math.abs(da[i + 1] - db[i + 1]) > 24 || Math.abs(da[i + 2] - db[i + 2]) > 24) n += 1;
+        }
+        return n;
+      },
+      [quiet.toString("base64"), after.toString("base64")]
+    );
+    expect(changed).toBe(0);
+  });
+});

@@ -206,7 +206,6 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     antialias: false,
     depth: false,
     stencil: false,
-    desynchronized: true,
   });
   if (!gl) return () => undefined;
   const parallel = gl.getExtension("KHR_parallel_shader_compile");
@@ -299,11 +298,6 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
   let unmountTimer = 0;
   let resizeTimer = 0;
   let readyTimer = 0;
-  // last frame's drawn box, in device pixels (cleared next frame)
-  let lastX = 0;
-  let lastY = 0;
-  let lastW = 0;
-  let lastH = 0;
   let scrollRaf = 0;
   // pill geometry in canvas coordinates
   let cx = 0;
@@ -405,11 +399,6 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
   const mount = () => {
     if (mounted) return;
     mounted = true;
-    // nothing known about what is on the canvas: the first frame clears it all
-    lastX = 0;
-    lastY = 0;
-    lastW = canvas.width;
-    lastH = canvas.height;
     host.insertBefore(canvas, host.firstChild);
   };
   const unmount = () => {
@@ -623,17 +612,12 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     const scY = Math.max(0, Math.floor((zh - sy1) * dpr));
     const scW = Math.max(0, Math.ceil(sx1 * dpr) - scX);
     const scH = Math.max(0, Math.ceil((zh - sy0) * dpr) - scY);
-    // clear what was drawn last frame plus this frame's box (a low-latency
-    // canvas keeps its pixels between frames), then draw this frame's box
-    const ux = Math.min(scX, lastX);
-    const uy = Math.min(scY, lastY);
-    gl.scissor(ux, uy, Math.max(scX + scW, lastX + lastW) - ux, Math.max(scY + scH, lastY + lastH) - uy);
+    // wipe the whole canvas every frame (one cheap GPU clear): the browser
+    // may hand back any of several older buffers, and nothing may linger
+    gl.disable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    lastX = scX;
-    lastY = scY;
-    lastW = scW;
-    lastH = scH;
+    gl.enable(gl.SCISSOR_TEST);
     gl.scissor(scX, scY, scW, scH);
     gl.uniform2f(uRes, zw, zh);
     gl.uniform1f(uDpr, dpr);
