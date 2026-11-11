@@ -67,8 +67,9 @@ test.describe("desktop mouse", () => {
     await expect(page.locator("#contact .whisper-wrap")).toHaveClass(/is-goo/);
     // the canvas is the zone around the pill only
     const cb = (await canvas.boundingBox())!;
-    expect(cb.width).toBeLessThanOrEqual(box.width + 2 * 190 + 1);
-    expect(cb.height).toBeLessThanOrEqual(box.height + 2 * 190 + 1);
+    // the canvas: the pill's surroundings and its row, never the whole footer
+    expect(cb.height).toBeLessThanOrEqual(box.height + 2 * 140 + 1);
+    expect(cb.width).toBeLessThan(900);
     expect(await page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number } }).__whisperWebStats.strands)).toBeGreaterThan(0);
     // goo next to the pill, nothing out past the pointer
     expect((await page.screenshot({ clip: reachArea })).equals(quietReach)).toBe(false);
@@ -146,7 +147,10 @@ test.describe("the button's lane", () => {
     await page.mouse.move(x, y);
     await page.waitForTimeout(500);
     await expect(page.locator(".whisper-goo")).toHaveCount(1);
-    expect(await page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number } }).__whisperWebStats.strands)).toBeGreaterThan(0);
+    const stats = () => page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number; reach: number } }).__whisperWebStats);
+    expect((await stats()).strands).toBeGreaterThan(0);
+    // however far along the row, the tendrils reach the pointer itself
+    await expect.poll(async () => (await stats()).reach, { timeout: 3000 }).toBeLessThan(14);
     await page.mouse.move(x, y - 300, { steps: 4 });
     await expect(page.locator(".whisper-goo")).toHaveCount(0, { timeout: 6000 });
   });

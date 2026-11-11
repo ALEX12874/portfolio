@@ -22,7 +22,8 @@ import { voiceState } from "../../lib/voicePlayer";
 export const ZONE_PADDING = 140; // px around the button where the goo wakes up
 // …and anywhere along the button's own row (its "lane": the ruled row it
 // sits in), however far across
-const DRAW_PAD = 190; // px of canvas around the button: room for full-length tendrils
+const DRAW_PAD = 190; // px of canvas around the button (and past the lane's ends)
+const VPAD = 140; // px of canvas above and below the button
 export const MAX_STRANDS = 5;
 export const AWARENESS = 150; // px from the pill's edge where tendrils start reaching
 export const MAX_LEN = 170; // px, longest a tendril grows
@@ -47,6 +48,7 @@ interface Stats {
   js: number[];
   lat: number[];
   strands?: number;
+  reach?: number; // px from the pointer to the nearest reaching tip
 }
 
 const VERT = `#version 300 es
@@ -64,6 +66,7 @@ uniform float uDpr;
 uniform float uTime;
 uniform vec4 uBtn;    // pill: centre x, y, half width, half height (CSS px, y down)
 uniform vec4 uMound;  // bulge toward the pointer: x, y, radius, amount
+uniform vec4 uGrip;   // the drop of goo where the tips hold the pointer: x, y, radius, amount
 uniform vec4 uPts[S * P]; // rope points: x, y, radius
 uniform vec4 uBox[S];     // tendril bounds (skip pixels far from it)
 out vec4 outC;
@@ -101,6 +104,7 @@ float field(vec2 p) {
       dt = min(dt, sdSeg(p, a.xyz, b.xyz));
     }
   }
+  if (uGrip.w > 0.01) dt = smin(dt, length(p - uGrip.xy) - uGrip.z, 8.0);
   return smin(d, dt, 10.0);
 }
 
@@ -149,7 +153,6 @@ export function startWhisperGoo(host: HTMLElement, button: HTMLElement): () => v
 }
 
 function start(host: HTMLElement, button: HTMLElement): () => void {
-  const PAD = DRAW_PAD;
   const S = MAX_STRANDS;
   const footer = host.closest("footer") ?? host;
   const stats = (window as unknown as { __whisperWebStats?: Stats }).__whisperWebStats;
@@ -158,8 +161,6 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   const canvas = document.createElement("canvas");
   canvas.className = "whisper-goo";
   canvas.setAttribute("aria-hidden", "true");
-  canvas.style.left = `${-PAD}px`;
-  canvas.style.top = `${-PAD}px`;
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     premultipliedAlpha: true,
@@ -201,6 +202,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   const uTime = gl.getUniformLocation(prog, "uTime");
   const uBtn = gl.getUniformLocation(prog, "uBtn");
   const uMound = gl.getUniformLocation(prog, "uMound");
+  const uGrip = gl.getUniformLocation(prog, "uGrip");
   const uPts = gl.getUniformLocation(prog, "uPts");
   const uBox = gl.getUniformLocation(prog, "uBox");
 
@@ -218,6 +220,11 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   let pageTop = 0;
   let laneTop = 0;
   let laneBottom = 0;
+  let padL = DRAW_PAD;
+  let padR = DRAW_PAD;
+  const padT = VPAD;
+  const padB = VPAD;
+  let grip = 0; // how firmly the tendrils hold the pointer (0–1)
   let laneLeft = 0;
   let laneRight = 0;
   let bw = 0;
@@ -262,10 +269,10 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   /** Keep the goo off every heading, text and control near the button. */
   const computeClip = (left: number, top: number) => {
     clipT = clipR = clipB = clipL = 0;
-    const zl = left - PAD;
-    const zt = top - PAD;
-    const zr = left + bw + PAD;
-    const zb = top + bh + PAD;
+    const zl = left - padL;
+    const zt = top - padT;
+    const zr = left + bw + padR;
+    const zb = top + bh + padB;
     footer.querySelectorAll("dl, form, h2, p, a, button, input, textarea").forEach((el) => {
       if (host.contains(el)) return;
       const r = el.getBoundingClientRect();
@@ -314,18 +321,26 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     const w = button.offsetWidth;
     const h = button.offsetHeight;
     const d = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    if (w !== bw || h !== bh || d !== dpr) {
+    // the canvas covers the button's surroundings and its whole lane, so a
+    // tendril can reach the pointer anywhere along the row
+    const pl = Math.max(DRAW_PAD, Math.round(r.left - row.left) + 30);
+    const pr = Math.max(DRAW_PAD, Math.round(row.right - r.right) + 30);
+    if (w !== bw || h !== bh || d !== dpr || pl !== padL || pr !== padR) {
       bw = w;
       bh = h;
       dpr = d;
-      zw = bw + 2 * PAD;
-      zh = bh + 2 * PAD;
-      cx = PAD + bw / 2;
-      cy = PAD + bh / 2;
+      padL = pl;
+      padR = pr;
+      zw = padL + bw + padR;
+      zh = padT + bh + padB;
+      cx = padL + bw / 2;
+      cy = padT + bh / 2;
       hw = bw / 2;
       hh = bh / 2;
       canvas.width = Math.round(zw * dpr);
       canvas.height = Math.round(zh * dpr);
+      canvas.style.left = `${-padL}px`;
+      canvas.style.top = `${-padT}px`;
       canvas.style.width = `${zw}px`;
       canvas.style.height = `${zh}px`;
     }
@@ -370,8 +385,8 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     else if (dt < 0) dt = 0;
     time += dt;
 
-    let lx = px - (pageLeft - window.scrollX) + PAD;
-    let ly = py - (pageTop - window.scrollY) + PAD;
+    let lx = px - (pageLeft - window.scrollX) + padL;
+    let ly = py - (pageTop - window.scrollY) + padT;
     const lane = inLane();
     const inside = lane || inZone();
     // tendrils reach only into the part of the canvas that shows
@@ -425,8 +440,10 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
           const dx = lx - ax;
           const dy = ly - ay;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (!aware || d > MAX_LEN * SNAP_STRETCH) state[k] = 2;
-          else target = d < MAX_LEN ? d : MAX_LEN;
+          // in the lane they reach all the way; elsewhere they snap when
+          // pulled too far
+          if (!aware || (!lane && d > MAX_LEN * SNAP_STRETCH)) state[k] = 2;
+          else target = lane || d < MAX_LEN ? d : MAX_LEN;
         }
         if (len[k] < target) len[k] = Math.min(target, len[k] + GROW_SPEED * SUBSTEP);
         else len[k] = Math.max(target, len[k] - (state[k] === 2 ? RETRACT_SPEED : GROW_SPEED) * SUBSTEP);
@@ -448,15 +465,15 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
           pos[o + 1] += vy + GRAVITY * SUBSTEP * SUBSTEP * (i / (P - 1));
         }
         if (state[k] === 1) {
-          // each tip latches a little beside the pointer (the fingers fan
-          // out) and slithers slightly
+          // the roots are spread along the pill's edge, the tips gather on
+          // the pointer: they close on it like fingers, slithering slightly
           const o = base + (P - 1) * 2;
           let fx = lx - ax;
           let fy = ly - ay;
           const fl = Math.sqrt(fx * fx + fy * fy) || 1;
           fx /= fl;
           fy /= fl;
-          const side = LATERAL[k] * 0.6 + Math.sin(time * 3.1 + k * 2.3) * 4;
+          const side = LATERAL[k] * 0.1 + Math.sin(time * 3.1 + k * 2.3) * 2;
           pos[o] += (lx - fy * side - pos[o]) * TIP_PULL;
           pos[o + 1] += (ly + fx * side - pos[o + 1]) * TIP_PULL;
         }
@@ -482,7 +499,9 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
       }
     }
 
-    // upload: points with tapering radius (thinner when stretched), bounds
+    // upload: points with tapering radius (thinner when stretched), bounds;
+    // and how close the nearest reaching tip is to the pointer
+    let nearest = 1e5;
     for (let k = 0; k < S; k += 1) {
       const b4 = k * 4;
       if (state[k] === 0 || len[k] < 0.5) {
@@ -509,11 +528,21 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
         if (pos[o + 1] < y0) y0 = pos[o + 1];
         if (pos[o + 1] > y1) y1 = pos[o + 1];
       }
+      if (state[k] === 1) {
+        const o = (k * P + P - 1) * 2;
+        const tdx = pos[o] - lx;
+        const tdy = pos[o + 1] - ly;
+        const td = Math.sqrt(tdx * tdx + tdy * tdy);
+        if (td < nearest) nearest = td;
+      }
       box[b4] = x0 - BASE_RADIUS - 18;
       box[b4 + 1] = y0 - BASE_RADIUS - 18;
       box[b4 + 2] = x1 + BASE_RADIUS + 18;
       box[b4 + 3] = y1 + BASE_RADIUS + 18;
     }
+
+    // the tips have the pointer: a small drop of goo gathers there
+    grip += ((aware && nearest < 12 ? 1 : 0) - grip) * Math.min(1, dt * 10);
 
     // draw only inside the goo's bounds (most of the canvas is empty)
     let sx0 = cx - hw - 24;
@@ -528,10 +557,9 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
       if (box[b4 + 2] > sx1) sx1 = box[b4 + 2];
       if (box[b4 + 3] > sy1) sy1 = box[b4 + 3];
     }
+    // (no clear needed: without preserveDrawingBuffer the browser hands us a
+    // cleared buffer every frame, and the shader writes every scissored pixel)
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.disable(gl.SCISSOR_TEST);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.SCISSOR_TEST);
     const scX = Math.max(0, Math.floor(sx0 * dpr));
     const scY = Math.max(0, Math.floor((zh - sy1) * dpr));
@@ -541,6 +569,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     gl.uniform1f(uTime, time);
     gl.uniform4f(uBtn, cx, cy, hw, hh);
     gl.uniform4f(uMound, mx, my, 1 + 9 * mound, mound);
+    gl.uniform4f(uGrip, lx, ly, 2 + 4 * grip, grip);
     gl.uniform4fv(uPts, pts);
     gl.uniform4fv(uBox, box);
     gl.bindVertexArray(vao);
@@ -554,6 +583,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     if (stats) {
       stats.js.push(performance.now() - t0);
       stats.strands = active;
+      stats.reach = nearest;
       if (inputT !== drawnInputT) {
         stats.lat.push(performance.now() - inputT);
         drawnInputT = inputT;
