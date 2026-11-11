@@ -1,14 +1,14 @@
 /**
- * Liquid mercury for the footer's "Whisper to me" pill (desktop mice only;
+ * Venom goo for the footer's "Whisper to me" pill (desktop mice only;
  * the loader in WhisperButton checks). While the pointer is near, the pill is
- * drawn as flowing liquid metal in WebGL: its surface swells toward the
+ * drawn as glossy black liquid in WebGL: its surface swells toward the
  * pointer, tendrils stretch out and latch onto it, and snap back into the
  * pill when pulled too far or when the pointer leaves.
  *
  * Shape: a 2-D signed-distance field (the pill smooth-merged with tapered
  * rope tendrils and a bulge), turned into a rounded height so every pixel
- * gets a normal; it mirrors a small studio (bright ceiling, dark horizon,
- * softboxes) that drifts slowly, all in one fragment shader pass.
+ * gets a normal; lit like black lacquer under studio strips (Fresnel
+ * reflections, a sharp key glint), all in one fragment shader pass.
  *
  * Cost model: one small canvas around the button, in the page only while the
  * goo shows. pointermove stores two numbers; one requestAnimationFrame loop
@@ -20,23 +20,26 @@ import { voiceState } from "../../lib/voicePlayer";
 
 // ---- tuning ----
 export const ZONE_PADDING = 140; // px around the button where the goo wakes up
+// …and anywhere along the button's own row (its "lane": the ruled row it
+// sits in), however far across
+const DRAW_PAD = 190; // px of canvas around the button: room for full-length tendrils
 export const MAX_STRANDS = 5;
 export const AWARENESS = 150; // px from the pill's edge where tendrils start reaching
 export const MAX_LEN = 170; // px, longest a tendril grows
 export const SNAP_STRETCH = 1.35; // snaps back when the pointer is this × MAX_LEN away
 export const GROW_SPEED = 900; // px/s
 export const RETRACT_SPEED = 1500; // px/s
-export const BASE_RADIUS = 9.5; // px, where a tendril leaves the pill (thick)
-export const TIP_RADIUS = 3.4; // px (each tip ends in a rounded drop)
+export const BASE_RADIUS = 6.5; // px, where a tendril leaves the pill
+export const TIP_RADIUS = 2.2; // px
 export const GRAVITY = 420; // px/s², a little sag
 export const SPAWN_GAP_MS = 110; // one new tendril at a time
 
 const P = 8; // rope points per tendril
-const SUBSTEP = 1 / 120; // s
+const SUBSTEP = 1 / 90; // s
 const MAX_DT = 0.032; // s
 const ROPE_DAMP = 0.86; // velocity kept per substep
 const TIP_PULL = 0.35; // how hard a reaching tip is drawn to the pointer, per substep
-const LATERAL = [0, 26, -26, 50, -50]; // px along the pill's edge, per tendril
+const LATERAL = [0, 30, -30, 60, -60]; // px along the pill's edge, per tendril
 const DPR_CAP = 2; // crisp on every screen; the scissor box keeps it cheap
 const IDLE_UNMOUNT_MS = 2000;
 
@@ -80,59 +83,57 @@ float smin(float a, float b, float k) {
 }
 float field(vec2 p) {
   float d = sdPill(p);
-  // liquid metal: one slow, smooth swell rolling along the edge
-  d += 0.7 * sin(p.x * 0.045 - uTime * 1.3) * sin(p.y * 0.09 + uTime * 0.8);
+  // the liquid's edge breathes a little
+  d += 0.45 * sin(p.x * 0.085 + uTime * 1.6) * sin(p.y * 0.12 - uTime * 1.25);
   if (uMound.w > 0.001) d = smin(d, length(p - uMound.xy) - uMound.z, 4.0 + 14.0 * uMound.w);
+  // the tendrils stay apart from each other (a hard union, so there is a gap
+  // between them); only where they leave the pill do they melt into it
+  float dt = 1e5;
   for (int s = 0; s < S; s++) {
     vec4 bb = uBox[s];
     if (p.x < bb.x || p.y < bb.y || p.x > bb.z || p.y > bb.w) continue;
-    float ds = 1e5;
-    for (int j = 0; j < P - 1; j++) ds = min(ds, sdSeg(p, uPts[s * P + j].xyz, uPts[s * P + j + 1].xyz));
-    d = smin(d, ds, 16.0); // fat, gooey joins
+    for (int j = 0; j < P - 1; j++) {
+      vec4 a = uPts[s * P + j], b = uPts[s * P + j + 1];
+      // skip pieces clearly farther than the nearest one so far (a cheap box test)
+      vec2 lo = min(a.xy, b.xy) - max(a.z, b.z), hi = max(a.xy, b.xy) + max(a.z, b.z);
+      vec2 out2 = max(max(lo - p, p - hi), 0.0);
+      if (dot(out2, out2) > dt * dt && dt < 1e4) continue;
+      dt = min(dt, sdSeg(p, a.xyz, b.xyz));
+    }
   }
-  return d;
+  return smin(d, dt, 10.0);
 }
 
 const vec3 IVORY = vec3(0.961, 0.941, 0.910);
-const vec3 RED = vec3(0.902, 0.220, 0.263);
 
-// a band with soft edges (a softbox seen in the metal)
-float band(float x, float c, float w, float soft) { return 1.0 - smoothstep(w - soft, w, abs(x - c)); }
-
-// the room the mercury mirrors: a bright ivory ceiling, a dark horizon
-// line, a dark floor, two softboxes and the faintest red bounce. It drifts a
-// little, so the metal always looks like it is flowing.
+// a small studio the black lacquer reflects: a long strip above, a strip to
+// the right and a key light (the sharp glint)
 vec3 env(vec3 R) {
-  vec2 r = R.xy + vec2(0.07 * sin(uTime * 0.6), 0.05 * sin(uTime * 0.85 + 1.3));
-  float h = -r.y; // up
-  vec3 c = mix(IVORY * (0.05 + 0.05 * smoothstep(-1.0, -0.5, h)), IVORY * (0.5 + 0.5 * smoothstep(0.0, 0.9, h)), smoothstep(-0.4, -0.3, h));
-  c *= 1.0 - 0.9 * exp(-pow((h + 0.36) / 0.04, 2.0)); // the horizon, low on the face
-  c += IVORY * 1.5 * band(r.y, -0.64, 0.12, 0.07) * band(r.x, 0.0, 0.72, 0.3);
-  c += IVORY * 0.9 * band(r.x, 0.74, 0.08, 0.06) * band(r.y, -0.1, 0.5, 0.25);
-  c += RED * 0.05 * exp(-pow((r.y - 0.8) / 0.15, 2.0));
-  return c;
+  float top = exp(-pow((R.y + 0.6) / 0.17, 2.0)) * (1.0 - smoothstep(0.5, 0.95, abs(R.x)));
+  float side = exp(-pow((R.x - 0.72) / 0.11, 2.0)) * (1.0 - smoothstep(0.15, 0.7, abs(R.y + 0.1)));
+  float key = pow(max(dot(R, normalize(vec3(-0.45, -0.62, 0.64))), 0.0), 90.0);
+  return IVORY * (3.0 * top + 1.4 * side + 9.0 * key);
 }
 
 void main() {
   vec2 p = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;
   float d = field(p);
   if (d > 1.0 / uDpr) { outC = vec4(0.0); return; }
+  // rounded height from the distance: a quarter-circle bevel 12 px wide
   float e = 0.75;
   vec2 g = vec2(field(p + vec2(e, 0.0)) - d, field(p + vec2(0.0, e)) - d) / e;
-  // a thick, rounded body: a quarter-circle bevel 16 px wide, perfectly smooth
-  float T = 16.0;
+  float T = 12.0;
   float x = clamp(-d / T, 0.0, 1.0);
   float slope = (1.0 - x) / max(sqrt(1.0 - (1.0 - x) * (1.0 - x)), 0.12);
   vec3 N = normalize(vec3(g * slope, 1.0));
   vec3 R = reflect(vec3(0.0, 0.0, -1.0), N);
-  // mercury: a mirror almost everywhere, a touch brighter at grazing angles
-  float F = 0.74 + 0.26 * pow(1.0 - N.z, 5.0);
-  vec3 col = env(R) * F;
-  // satin: a soft sheen over the mirror, and one crisp key glint
+  // glossy black: dark face-on, the studio shows at the curves
+  float F = 0.08 + 0.92 * pow(1.0 - N.z, 4.0);
+  vec3 col = vec3(0.012) + env(R) * F;
   vec3 H = normalize(normalize(vec3(-0.45, -0.62, 0.64)) + vec3(0.0, 0.0, 1.0));
   float nh = max(dot(N, H), 0.0);
-  col += IVORY * (pow(nh, 30.0) * 0.12 + pow(nh, 500.0) * 1.8);
-  col = 1.0 - exp(-col * 1.35);
+  col += IVORY * pow(nh, 200.0) * 2.4;
+  col = 1.0 - exp(-col * 1.4); // crisp highlights, never washed out
   col = pow(col, vec3(1.0 / 2.2));
   float cov = clamp(0.5 - d * uDpr, 0.0, 1.0);
   outC = vec4(col * cov, cov);
@@ -148,7 +149,7 @@ export function startWhisperGoo(host: HTMLElement, button: HTMLElement): () => v
 }
 
 function start(host: HTMLElement, button: HTMLElement): () => void {
-  const PAD = ZONE_PADDING;
+  const PAD = DRAW_PAD;
   const S = MAX_STRANDS;
   const footer = host.closest("footer") ?? host;
   const stats = (window as unknown as { __whisperWebStats?: Stats }).__whisperWebStats;
@@ -215,6 +216,10 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
 
   let pageLeft = 0;
   let pageTop = 0;
+  let laneTop = 0;
+  let laneBottom = 0;
+  let laneLeft = 0;
+  let laneRight = 0;
   let bw = 0;
   let bh = 0;
   let zw = 0;
@@ -300,6 +305,12 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     const r = button.getBoundingClientRect();
     pageLeft = r.left + window.scrollX;
     pageTop = r.top + window.scrollY;
+    // the lane: the button's row, from its top rule to its bottom rule
+    const row = (host.parentElement ?? host).getBoundingClientRect();
+    laneTop = row.top + window.scrollY;
+    laneBottom = row.bottom + window.scrollY;
+    laneLeft = row.left + window.scrollX;
+    laneRight = row.right + window.scrollX;
     const w = button.offsetWidth;
     const h = button.offsetHeight;
     const d = Math.min(DPR_CAP, window.devicePixelRatio || 1);
@@ -361,7 +372,8 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
 
     let lx = px - (pageLeft - window.scrollX) + PAD;
     let ly = py - (pageTop - window.scrollY) + PAD;
-    const inside = lx >= 0 && ly >= 0 && lx <= zw && ly <= zh;
+    const lane = inLane();
+    const inside = lane || inZone();
     // tendrils reach only into the part of the canvas that shows
     if (lx < clipL + 8) lx = clipL + 8;
     else if (lx > zw - clipR - 8) lx = zw - clipR - 8;
@@ -370,8 +382,9 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     const dist = edge(lx, ly);
     // reaching only from outside the pill: hovering, clicking or listening,
     // the pill keeps its clean shape
-    const aware = inside && dist > 6 && dist < AWARENESS && voiceState().status !== "playing";
-    const close = aware ? 1 - Math.max(0, dist) / AWARENESS : 0;
+    // (in the lane, however far away, the tendrils still reach toward it)
+    const aware = inside && dist > 6 && (dist < AWARENESS || lane) && voiceState().status !== "playing";
+    const close = aware ? Math.max(lane ? 0.45 : 0, 1 - Math.max(0, dist) / AWARENESS) : 0;
     // the surface swells toward the pointer
     const mx = ex + enx * (3 + 5 * close);
     const my = ey + eny * (3 + 5 * close);
@@ -443,11 +456,11 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
           const fl = Math.sqrt(fx * fx + fy * fy) || 1;
           fx /= fl;
           fy /= fl;
-          const side = LATERAL[k] * 0.32 + Math.sin(time * 3.1 + k * 2.3) * 4;
+          const side = LATERAL[k] * 0.6 + Math.sin(time * 3.1 + k * 2.3) * 4;
           pos[o] += (lx - fy * side - pos[o]) * TIP_PULL;
           pos[o + 1] += (ly + fx * side - pos[o + 1]) * TIP_PULL;
         }
-        for (let it = 0; it < 3; it += 1) {
+        for (let it = 0; it < 2; it += 1) {
           for (let i = 0; i < P - 1; i += 1) {
             const a = base + i * 2;
             const b = a + 2;
@@ -478,7 +491,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
         continue;
       }
       active += 1;
-      const thin = len[k] > 70 ? Math.max(0.7, Math.sqrt(70 / len[k])) : 1;
+      const thin = len[k] > 60 ? Math.max(0.62, Math.sqrt(60 / len[k])) : 1;
       let x0 = 1e5;
       let y0 = 1e5;
       let x1 = -1e5;
@@ -487,11 +500,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
         const o = (k * P + i) * 2;
         const q = (k * P + i) * 4;
         const t = i / (P - 1);
-        // thick root, thinning neck, a rounded drop at the tip; a gentle
-        // swell travels out along it
-        const bulb = t > 0.8 ? (t - 0.8) * 5 : 0;
-        const ripple = 1 + 0.07 * Math.sin(time * 4 - i * 0.9 + k * 1.9) * (0.3 + t);
-        const r = (BASE_RADIUS + (TIP_RADIUS - BASE_RADIUS) * Math.sqrt(t) + bulb) * thin * ripple;
+        const r = (BASE_RADIUS + (TIP_RADIUS - BASE_RADIUS) * t) * thin;
         pts[q] = pos[o];
         pts[q + 1] = pos[o + 1];
         pts[q + 2] = r;
@@ -584,8 +593,14 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
   const inZone = () => {
     const l = pageLeft - window.scrollX;
     const t = pageTop - window.scrollY;
-    return px >= l - PAD && px <= l + bw + PAD && py >= t - PAD && py <= t + bh + PAD;
+    const Z = ZONE_PADDING;
+    return px >= l - Z && px <= l + bw + Z && py >= t - Z && py <= t + bh + Z;
   };
+  const inLane = () =>
+    py >= laneTop - window.scrollY &&
+    py <= laneBottom - window.scrollY &&
+    px >= laneLeft - window.scrollX &&
+    px <= laneRight - window.scrollX;
 
   const onMove = (e: PointerEvent) => {
     if (e.pointerType === "touch") return;
@@ -599,7 +614,7 @@ function start(host: HTMLElement, button: HTMLElement): () => void {
     px = x;
     py = y;
     inputT = e.timeStamp;
-    if (!running && onScreen && !document.hidden && inZone()) begin();
+    if (!running && onScreen && !document.hidden && (inZone() || inLane())) begin();
   };
   const onLeaveWindow = () => {
     px = -1e5;

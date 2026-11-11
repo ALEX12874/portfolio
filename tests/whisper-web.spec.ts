@@ -67,8 +67,8 @@ test.describe("desktop mouse", () => {
     await expect(page.locator("#contact .whisper-wrap")).toHaveClass(/is-goo/);
     // the canvas is the zone around the pill only
     const cb = (await canvas.boundingBox())!;
-    expect(cb.width).toBeLessThanOrEqual(box.width + 2 * 140 + 1);
-    expect(cb.height).toBeLessThanOrEqual(box.height + 2 * 140 + 1);
+    expect(cb.width).toBeLessThanOrEqual(box.width + 2 * 190 + 1);
+    expect(cb.height).toBeLessThanOrEqual(box.height + 2 * 190 + 1);
     expect(await page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number } }).__whisperWebStats.strands)).toBeGreaterThan(0);
     // goo next to the pill, nothing out past the pointer
     expect((await page.screenshot({ clip: reachArea })).equals(quietReach)).toBe(false);
@@ -127,3 +127,27 @@ for (const [name, opts] of [
     });
   });
 }
+
+test.describe("the button's lane", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test("anywhere along the button's row wakes the goo; leaving the row lets it go", async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { __whisperWebStats: unknown }).__whisperWebStats = { js: [], lat: [] };
+    });
+    await toPill(page);
+    const rowBox = async () => (await page.locator("#contact .whisper-wrap").locator("xpath=..").boundingBox())!;
+    const pill = (await page.locator("#contact .whisper").boundingBox())!;
+    let row = await rowBox();
+    // far to the right of the pill (beyond the 140 px zone), inside its row
+    const x = Math.min(row.x + row.width - 10, pill.x + pill.width + 300);
+    await page.mouse.move(x, row.y - 300);
+    row = await rowBox(); // measured right before entering (the page may have settled)
+    const y = row.y + row.height / 2;
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(500);
+    await expect(page.locator(".whisper-goo")).toHaveCount(1);
+    expect(await page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number } }).__whisperWebStats.strands)).toBeGreaterThan(0);
+    await page.mouse.move(x, y - 300, { steps: 4 });
+    await expect(page.locator(".whisper-goo")).toHaveCount(0, { timeout: 6000 });
+  });
+});
