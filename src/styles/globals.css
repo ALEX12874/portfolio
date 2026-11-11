@@ -1720,6 +1720,14 @@ html.lenis {
 }
 
 /* ---- footer: "Whisper to me" voice pill (components/layout/WhisperButton) ---- */
+/* the glossy black shared by the pill and the hero alien's circle */
+:root {
+  --goo-border: 1.5px solid rgba(245, 240, 232, 0.22);
+  --goo-gloss:
+    radial-gradient(90% 120% at 28% -10%, rgba(245, 240, 232, 0.3), rgba(245, 240, 232, 0) 48%),
+    linear-gradient(180deg, rgba(245, 240, 232, 0.08), rgba(245, 240, 232, 0) 55%);
+  --goo-inset: inset 0 1px 0 rgba(245, 240, 232, 0.35), inset 0 -8px 14px rgba(0, 0, 0, 0.55);
+}
 .whisper-wrap {
   position: relative;
   display: inline-block;
@@ -1731,24 +1739,18 @@ html.lenis {
   align-items: center;
   gap: 0.6rem;
   padding: 0 1.15rem 0 0.4rem;
-  /* black liquid mercury; on desktop the canvas (whisperGoo.ts) draws it
-     live while the pointer is near */
-  border: 1.5px solid rgba(245, 240, 232, 0.22);
+  /* glossy black (the Venom look); on desktop the canvas (whisperGoo.ts)
+     draws it live while the pointer is near */
+  border: var(--goo-border);
   border-radius: 999px;
-  background:
-    radial-gradient(90% 120% at 28% -10%, rgba(245, 240, 232, 0.3), rgba(245, 240, 232, 0) 48%),
-    linear-gradient(180deg, rgba(245, 240, 232, 0.08), rgba(245, 240, 232, 0) 55%),
-    #151515;
+  background: var(--goo-gloss), #151515;
   color: #f5f0e8;
   font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
-  box-shadow:
-    inset 0 1px 0 rgba(245, 240, 232, 0.35),
-    inset 0 -8px 14px rgba(0, 0, 0, 0.55),
-    0 10px 22px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--goo-inset), 0 10px 22px rgba(0, 0, 0, 0.5);
   touch-action: manipulation; /* quick taps never zoom */
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s, box-shadow 0.25s;
@@ -2002,19 +2004,13 @@ html.lenis {
 
 
 /* ---- hero: the fidgeting alien that becomes the voice bars (AlienButton) ---- */
-/* the same black liquid mercury as the footer's "Whisper to me" pill */
+/* the same glossy black as the footer's "Whisper to me" pill */
 .alien-btn,
 .alien-btn:hover {
-  border: 1.5px solid rgba(245, 240, 232, 0.22);
-  background:
-    radial-gradient(90% 90% at 30% 8%, rgba(245, 240, 232, 0.32), rgba(245, 240, 232, 0) 50%),
-    linear-gradient(180deg, rgba(245, 240, 232, 0.08), rgba(245, 240, 232, 0) 55%),
-    #151515;
+  border: var(--goo-border);
+  background: var(--goo-gloss), #151515;
   color: #f5f0e8;
-  box-shadow:
-    inset 0 1px 0 rgba(245, 240, 232, 0.35),
-    inset 0 -8px 14px rgba(0, 0, 0, 0.55),
-    0 10px 22px rgba(21, 21, 21, 0.28);
+  box-shadow: var(--goo-inset), 0 10px 22px rgba(21, 21, 21, 0.28);
 }
 .alien-btn svg * {
   transform-box: fill-box;
@@ -2161,5 +2157,16 @@ html.lenis {
   }
   .alien-bars {
     opacity: 0;
+  }
+}
+
+/* the hero billboard's label rises in when it appears (HeroScene/Billboard) */
+.billboard-label {
+  animation: billboard-label-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes billboard-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }

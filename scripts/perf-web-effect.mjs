@@ -1,6 +1,7 @@
 // Venom goo (footer "Whisper to me") performance probe.
 //   node scripts/perf-web-effect.mjs http://localhost:4173/ [out.json]
 //   BASELINE=1 node scripts/perf-web-effect.mjs …   (same run, effect off)
+//   HERO=1 node scripts/perf-web-effect.mjs …       (the hero alien's smaller goo)
 // Drives the mouse in a circle around the button for 10 s, at normal speed and
 // with 4× CPU throttling, and reports frame times, the effect's JS time per
 // frame, input-to-draw latency, long tasks and (from a devtools.timeline
@@ -36,25 +37,29 @@ for (const throttle of [1, 4]) {
     });
   }
   await p.addInitScript(() => {
-    window.__whisperWebStats = { js: [], lat: [] };
+    window.__gooStats = { js: [], lat: [] };
     window.__long = [];
     new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__long.push(e.duration))).observe({ type: "longtask" });
   });
+  const hero = !!process.env.HERO;
   await p.goto(url, { waitUntil: "load" });
-  await p.evaluate(() => document.getElementById("contact").scrollIntoView({ behavior: "instant" }));
-  const pill = p.locator("#contact .whisper");
+  if (!hero) await p.evaluate(() => document.getElementById("contact").scrollIntoView({ behavior: "instant" }));
+  const pill = p.locator(hero ? "#home .alien-btn" : "#contact .whisper");
   await pill.scrollIntoViewIfNeeded();
-  await p.waitForTimeout(2500);
+  // the hero goo starts after the first 5 s
+  await p.waitForTimeout(hero ? 7000 : 2500);
   const box = await pill.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   const cdp = await ctx.newCDPSession(p);
   if (throttle > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
-  await p.mouse.move(cx + box.width / 2 + 70, cy);
+  const ringX = hero ? box.width / 2 + 40 : box.width / 2 + 70;
+  const ringY = hero ? box.height / 2 + 40 : box.height / 2 + 60;
+  await p.mouse.move(cx + ringX, cy);
   await p.waitForTimeout(300);
   await p.evaluate(() => {
-    window.__whisperWebStats.js.length = 0;
-    window.__whisperWebStats.lat.length = 0;
+    window.__gooStats.js.length = 0;
+    window.__gooStats.lat.length = 0;
     window.__long.length = 0;
     window.__frames = [];
     let prev = 0;
@@ -66,8 +71,8 @@ for (const throttle of [1, 4]) {
     requestAnimationFrame(tick);
   });
   await b.startTracing(p, { categories: ["devtools.timeline"] });
-  const rx = box.width / 2 + 70;
-  const ry = box.height / 2 + 60;
+  const rx = ringX;
+  const ry = ringY;
   const t0 = Date.now();
   while (Date.now() - t0 < RUN_MS) {
     const a = ((Date.now() - t0) / 1000) * Math.PI; // one lap per 2 s
@@ -77,7 +82,7 @@ for (const throttle of [1, 4]) {
   const trace = await b.stopTracing();
   const s = await p.evaluate(() => {
     window.__stopFrames = true;
-    return { js: window.__whisperWebStats.js, lat: window.__whisperWebStats.lat, long: window.__long, frames: window.__frames };
+    return { js: window.__gooStats.js, lat: window.__gooStats.lat, long: window.__long, frames: window.__frames };
   });
   const ev = JSON.parse(trace.toString()).traceEvents || [];
   const count = (name) => ev.filter((e) => e.name === name && (e.ph === "X" || e.ph === "B")).length;
@@ -85,7 +90,7 @@ for (const throttle of [1, 4]) {
   const dropped = s.frames.filter((f) => f > refresh * 1.5).length;
   const fps = s.frames.length / (s.frames.reduce((x, y) => x + y, 0) / 1000);
   results.push({
-    run: `${throttle === 1 ? "normal" : "4× CPU throttle"}${process.env.BASELINE ? " (effect off)" : ""}`,
+    run: `${process.env.HERO ? "hero, " : ""}${throttle === 1 ? "normal" : "4× CPU throttle"}${process.env.BASELINE ? " (effect off)" : ""}`,
     frames: s.frames.length,
     fps: round(fps),
     frameMedian: round(pct(s.frames, 0.5)),

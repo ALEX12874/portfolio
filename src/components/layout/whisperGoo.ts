@@ -17,6 +17,7 @@
  */
 
 import { voiceState } from "../../lib/voicePlayer";
+import { holdScenes } from "../../lib/sceneArbiter";
 
 // ---- tuning ----
 export const ZONE_PADDING = 140; // px around the button where the goo wakes up
@@ -165,6 +166,8 @@ export interface GooOptions {
   quietWhilePlaying: boolean;
   /** container whose text and controls the goo must stay off */
   clipRoot: string;
+  /** pause the page's 3D scenes while the goo moves (it shares their GPU) */
+  pauseScenes: boolean;
 }
 
 const FOOTER_PILL: GooOptions = {
@@ -180,6 +183,7 @@ const FOOTER_PILL: GooOptions = {
   lane: true,
   quietWhilePlaying: true,
   clipRoot: "footer",
+  pauseScenes: false,
 };
 
 /** Starts the effect; returns its cleanup. Any failure disables it silently. */
@@ -194,7 +198,7 @@ export function startWhisperGoo(host: HTMLElement, button: HTMLElement, options:
 function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => void {
   const S = MAX_STRANDS;
   const footer = host.closest<HTMLElement>(cfg.clipRoot) ?? host;
-  const stats = (window as unknown as { __whisperWebStats?: Stats }).__whisperWebStats;
+  const stats = (window as unknown as { __gooStats?: Stats }).__gooStats;
 
   // ---- WebGL, prepared up front (shaders compile in the background) ----
   const canvas = document.createElement("canvas");
@@ -298,6 +302,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
   let unmountTimer = 0;
   let resizeTimer = 0;
   let readyTimer = 0;
+  let lastMeasure = 0;
   let scrollRaf = 0;
   // pill geometry in canvas coordinates
   let cx = 0;
@@ -358,6 +363,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
   };
 
   const measure = () => {
+    lastMeasure = performance.now();
     const r = button.getBoundingClientRect();
     pageLeft = r.left + window.scrollX;
     pageTop = r.top + window.scrollY;
@@ -648,6 +654,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     if (!inside && active === 0 && mound < 0.01) {
       // at rest: keep the last frame (the pill) for a moment, then hand back
       running = false;
+      if (cfg.pauseScenes) holdScenes("goo", false);
       window.clearTimeout(unmountTimer);
       unmountTimer = window.setTimeout(unmount, IDLE_UNMOUNT_MS);
       return;
@@ -670,6 +677,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     measure();
     mount();
     running = true;
+    if (cfg.pauseScenes) holdScenes("goo", true);
     last = performance.now();
     acc = 0;
     raf = requestAnimationFrame(frame);
@@ -677,6 +685,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
 
   const halt = () => {
     running = false;
+    if (cfg.pauseScenes) holdScenes("goo", false);
     cancelAnimationFrame(raf);
     state.fill(0);
     len.fill(0);
@@ -709,7 +718,12 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     px = x;
     py = y;
     inputT = e.timeStamp;
-    if (!running && onScreen && !document.hidden && (inZone() || inLane())) begin();
+    if (running || !onScreen || document.hidden) return;
+    // near where the button was last measured: measure again (at most every
+    // 150 ms) in case the page moved it, then decide
+    const t = pageTop - window.scrollY;
+    if (py > t - cfg.zone - 250 && py < t + bh + cfg.zone + 250 && performance.now() - lastMeasure > 150) measure();
+    if (inZone() || inLane()) begin();
   };
   const onLeaveWindow = () => {
     px = -1e5;
@@ -765,6 +779,9 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
   });
   ro.observe(footer);
   ro.observe(button);
+  // sections above that finish loading move the button without resizing it:
+  // the page's own height changes then, so measure again
+  ro.observe(document.body);
   document.addEventListener("visibilitychange", onVisibility);
 
   return () => {
@@ -779,6 +796,7 @@ function start(host: HTMLElement, button: HTMLElement, cfg: GooOptions): () => v
     window.clearTimeout(resizeTimer);
     window.clearTimeout(readyTimer);
     running = false;
+    if (cfg.pauseScenes) holdScenes("goo", false);
     unmount();
     host.style.removeProperty("isolation");
     gl.getExtension("WEBGL_lose_context")?.loseContext();

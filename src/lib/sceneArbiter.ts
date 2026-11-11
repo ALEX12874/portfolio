@@ -24,7 +24,22 @@ function decide() {
       best = id;
     }
   });
-  entries.forEach((e, id) => e.set(id === best && e.visible > 0));
+  entries.forEach((e, id) => e.set(holds.size === 0 && id === best && e.visible > 0));
+}
+
+const holds = new Set<string>();
+
+/**
+ * Something small needs the GPU to itself for a moment (the hero alien's
+ * goo, while the pointer plays with it): every 3D scene pauses on its last
+ * frame until released, then the most visible one carries on.
+ */
+export function holdScenes(by: string, on: boolean) {
+  const had = holds.has(by);
+  if (on === had) return;
+  if (on) holds.add(by);
+  else holds.delete(by);
+  decide();
 }
 
 const THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);

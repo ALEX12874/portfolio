@@ -50,7 +50,7 @@ test.describe("desktop mouse", () => {
 
   test("near the button: goo reaches from the pill, then pulls back and hands over", async ({ page }) => {
     await page.addInitScript(() => {
-      (window as unknown as { __whisperWebStats: unknown }).__whisperWebStats = { js: [], lat: [] };
+      (window as unknown as { __gooStats: unknown }).__gooStats = { js: [], lat: [] };
     });
     await toPill(page);
     const box = (await page.locator("#contact .whisper").boundingBox())!;
@@ -70,7 +70,7 @@ test.describe("desktop mouse", () => {
     // the canvas: the pill's surroundings and its row, never the whole footer
     expect(cb.height).toBeLessThanOrEqual(box.height + 2 * 140 + 1);
     expect(cb.width).toBeLessThan(900);
-    expect(await page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number } }).__whisperWebStats.strands)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => (window as unknown as { __gooStats: { strands: number } }).__gooStats.strands)).toBeGreaterThan(0);
     // goo next to the pill, nothing out past the pointer
     expect((await page.screenshot({ clip: reachArea })).equals(quietReach)).toBe(false);
     expect((await page.screenshot({ clip: beyond })).equals(quietBeyond)).toBe(true);
@@ -133,7 +133,7 @@ test.describe("the button's lane", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
   test("anywhere along the button's row wakes the goo; leaving the row lets it go", async ({ page }) => {
     await page.addInitScript(() => {
-      (window as unknown as { __whisperWebStats: unknown }).__whisperWebStats = { js: [], lat: [] };
+      (window as unknown as { __gooStats: unknown }).__gooStats = { js: [], lat: [] };
     });
     await toPill(page);
     const rowBox = async () => (await page.locator("#contact .whisper-wrap").locator("xpath=..").boundingBox())!;
@@ -147,7 +147,7 @@ test.describe("the button's lane", () => {
     await page.mouse.move(x, y);
     await page.waitForTimeout(500);
     await expect(page.locator("#contact .whisper-goo")).toHaveCount(1);
-    const stats = () => page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number; reach: number } }).__whisperWebStats);
+    const stats = () => page.evaluate(() => (window as unknown as { __gooStats: { strands: number; reach: number } }).__gooStats);
     expect((await stats()).strands).toBeGreaterThan(0);
     // however far along the row, the tendrils reach the pointer itself
     await expect.poll(async () => (await stats()).reach, { timeout: 3000 }).toBeLessThan(14);
@@ -160,7 +160,7 @@ test.describe("hero alien goo", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
   test("smaller tentacles reach from the alien circle and latch onto the pointer", async ({ page }) => {
     await page.addInitScript(() => {
-      (window as unknown as { __whisperWebStats: unknown }).__whisperWebStats = { js: [], lat: [] };
+      (window as unknown as { __gooStats: unknown }).__gooStats = { js: [], lat: [] };
     });
     await page.goto("/");
     await expect(page.locator("#shell")).toHaveCount(0, { timeout: 20_000 });
@@ -179,7 +179,7 @@ test.describe("hero alien goo", () => {
       )
       .toBe(1);
     const bb = (await btn.boundingBox())!;
-    const stats = () => page.evaluate(() => (window as unknown as { __whisperWebStats: { strands: number; reach: number } }).__whisperWebStats);
+    const stats = () => page.evaluate(() => (window as unknown as { __gooStats: { strands: number; reach: number } }).__gooStats);
     await expect.poll(async () => (await stats()).reach, { timeout: 3000 }).toBeLessThan(10);
     // the alien button still works
     await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);

@@ -565,21 +565,23 @@ export default function Billboard() {
                 </group>
               ))}
 
-              {/* editorial label above the board — never covers the artwork */}
-              <Html position={[0, 11.75, 0.3]} center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-                <div
-                  className="whitespace-nowrap rounded-full border px-3 py-1.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.16em] transition-[opacity,transform] duration-300"
-                  style={{
-                    borderColor: "rgba(21,21,21,0.25)",
-                    background: "rgba(245,240,232,0.96)",
-                    color: "#151515",
-                    opacity: hovered ? 1 : 0,
-                    transform: hovered ? "translateY(0)" : "translateY(6px)",
-                  }}
-                >
-                  Outdoor advertising / Brand attention
-                </div>
-              </Html>
+              {/* editorial label above the board — never covers the artwork; in
+                  the page only while shown (drei's Html re-places itself every
+                  frame, which cost a page layout per frame even when hidden) */}
+              {hovered ? (
+                <Html position={[0, 11.75, 0.3]} center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+                  <div
+                    className="billboard-label whitespace-nowrap rounded-full border px-3 py-1.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.16em]"
+                    style={{
+                      borderColor: "rgba(21,21,21,0.25)",
+                      background: "rgba(245,240,232,0.96)",
+                      color: "#151515",
+                    }}
+                  >
+                    Outdoor advertising / Brand attention
+                  </div>
+                </Html>
+              ) : null}
             </group>
           </group>
         </group>

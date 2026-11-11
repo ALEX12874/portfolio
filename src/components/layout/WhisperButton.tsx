@@ -10,6 +10,7 @@ import {
   voiceAudio,
   voiceState,
 } from "../../lib/voicePlayer";
+import { startGooWhen, whenNear } from "../../lib/gooLoader";
 
 const BARS = [0, 1, 2, 3, 4];
 const HINT = "Triple-tap for LinkedIn";
@@ -88,39 +89,12 @@ export default function WhisperButton() {
   }, []);
 
   // desktop mice only: the pill turns to living goo that reaches for the
-  // pointer (./whisperGoo, its own chunk, fetched once the footer is near)
+  // pointer (its own chunk, fetched once the footer is near)
   useEffect(() => {
     const host = wrap.current;
     const btn = button.current;
-    if (
-      !host ||
-      !btn ||
-      typeof IntersectionObserver === "undefined" ||
-      typeof ResizeObserver === "undefined" ||
-      !window.matchMedia("(hover: hover) and (pointer: fine)").matches ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      return undefined;
-    let stop: (() => void) | undefined;
-    let live = true;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (!e.isIntersecting) return;
-        io.disconnect();
-        import("./whisperGoo")
-          .then((m) => {
-            if (live) stop = m.startWhisperGoo(host, btn);
-          })
-          .catch(() => undefined);
-      },
-      { rootMargin: "600px 0px" }
-    );
-    io.observe(host);
-    return () => {
-      live = false;
-      io.disconnect();
-      stop?.();
-    };
+    if (!host || !btn || typeof IntersectionObserver === "undefined") return undefined;
+    return startGooWhen(whenNear(host), host, btn);
   }, []);
 
   return (

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { scrollToCenter, scrollToSection } from "../../lib/scroll";
 import { whenLiveSceneMayStart } from "../../lib/settle";
+import { startGooWhen } from "../../lib/gooLoader";
+import type { GooOptions } from "../layout/whisperGoo";
 import { markInteracted, playVoice, unlockVoice } from "../../lib/voicePlayer";
 
 /**
@@ -49,7 +51,7 @@ function goToVoice() {
 }
 
 /** The footer pill's goo, smaller: short tentacles that latch onto the pointer. */
-const HERO_GOO = {
+const HERO_GOO: Partial<GooOptions> = {
   zone: 70,
   pad: 110,
   vpad: 110,
@@ -62,6 +64,8 @@ const HERO_GOO = {
   lane: false,
   quietWhilePlaying: false,
   clipRoot: ".hero-copy",
+  // the hero's 3D scene shares the GPU: it pauses on its frame while the goo plays
+  pauseScenes: true,
 };
 
 export default function AlienButton() {
@@ -71,25 +75,7 @@ export default function AlienButton() {
   // scene): the goo chunk, shared with the footer pill, wakes up here too
   useEffect(() => {
     const btn = ref.current;
-    if (
-      !btn ||
-      typeof ResizeObserver === "undefined" ||
-      !window.matchMedia("(hover: hover) and (pointer: fine)").matches ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      return undefined;
-    let stop: (() => void) | undefined;
-    let live = true;
-    void whenLiveSceneMayStart()
-      .then(() => import("../layout/whisperGoo"))
-      .then((m) => {
-        if (live) stop = m.startWhisperGoo(btn, btn, HERO_GOO);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-      stop?.();
-    };
+    return btn ? startGooWhen(whenLiveSceneMayStart, btn, btn, HERO_GOO) : undefined;
   }, []);
 
   return (
@@ -101,21 +87,21 @@ export default function AlienButton() {
       title="Whisper to me"
       className="icon-circle alien-btn relative !h-[52px] !w-[52px]"
     >
-      <svg viewBox="0 0 40 40" className="h-[38px] w-[38px] overflow-visible" aria-hidden="true">
+      <svg viewBox="0 0 40 40" className="h-[42px] w-[42px] overflow-visible" aria-hidden="true">
         {/* the alien */}
         <g className="alien">
           <g className="alien-dance">
             <g className="alien-antenna alien-antenna--l">
-              <path d="M15 11 L12 5" stroke="#151515" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M15 11 L12 5" stroke="#D8FF63" strokeWidth="1.8" strokeLinecap="round" />
               <circle cx="11.6" cy="4.4" r="2" fill="#E63843" stroke="#151515" strokeWidth="1.2" />
             </g>
             <g className="alien-antenna alien-antenna--r">
-              <path d="M25 11 L28 5" stroke="#151515" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M25 11 L28 5" stroke="#D8FF63" strokeWidth="1.8" strokeLinecap="round" />
               <circle cx="28.4" cy="4.4" r="2" fill="#E63843" stroke="#151515" strokeWidth="1.2" />
             </g>
             {/* little body + waving arms */}
-            <path className="alien-arm alien-arm--l" d="M14 28 Q10 27 9 23" stroke="#151515" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-            <path className="alien-arm alien-arm--r" d="M26 28 Q30 27 31 23" stroke="#151515" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+            <path className="alien-arm alien-arm--l" d="M14 28 Q10 27 9 23" stroke="#D8FF63" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+            <path className="alien-arm alien-arm--r" d="M26 28 Q30 27 31 23" stroke="#D8FF63" strokeWidth="1.8" strokeLinecap="round" fill="none" />
             <rect x="15" y="25" width="10" height="9" rx="4" fill="#D8FF63" stroke="#151515" strokeWidth="1.6" />
             {/* head */}
             <ellipse cx="20" cy="18" rx="10.5" ry="8.8" fill="#D8FF63" stroke="#151515" strokeWidth="1.6" />
