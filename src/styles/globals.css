@@ -8,6 +8,8 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* light colours only: no automatic dark repaint (see index.html) */
+  color-scheme: only light;
 }
 
 html {

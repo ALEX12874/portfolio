@@ -41,20 +41,30 @@ function run(id: string) {
   window.setTimeout(() => sectionMounted(id), 8000);
 }
 
+/** The first section in page order that hasn't started yet. */
+function nextWaiting(): string | undefined {
+  return [...jobs.entries()].filter(([, j]) => !j.started).sort((a, b) => a[1].order - b[1].order)[0]?.[0];
+}
+
 /** Start the next waiting section on the next idle moment. */
 function pump() {
-  if (!opened || running > 0 || scheduled) return;
-  const next = [...jobs.entries()].filter(([, j]) => !j.started).sort((a, b) => a[1].order - b[1].order)[0];
-  if (!next) return;
+  if (!opened || running > 0 || scheduled || !nextWaiting()) return;
   scheduled = true;
   idle(() => {
     scheduled = false;
-    if (running > 0) return pump();
-    run(next[0]);
+    // chosen now, not when scheduled: meanwhile the visitor may have scrolled
+    // near a section and started it (choosing the stale one stalled the queue
+    // for good, leaving later sections as placeholders until scrolled to)
+    const id = nextWaiting();
+    if (running === 0 && id) run(id);
   });
 }
 
-/** The queue opens once the page has loaded (first screen painted). */
+/**
+ * The queue opens once the page has loaded (first screen painted), or 3 s
+ * after this script runs at the latest: one slow file (a font, an image on a
+ * weak connection) must never hold the rest of the page back.
+ */
 function open() {
   if (opened) return;
   opened = true;
@@ -62,7 +72,10 @@ function open() {
 }
 if (typeof window !== "undefined") {
   if (document.readyState === "complete") window.setTimeout(open, 0);
-  else window.addEventListener("load", () => window.setTimeout(open, 0), { once: true });
+  else {
+    window.addEventListener("load", () => window.setTimeout(open, 0), { once: true });
+    window.setTimeout(open, 3000);
+  }
 }
 
 export function enqueueSection(id: string, order: number, start: () => void) {
